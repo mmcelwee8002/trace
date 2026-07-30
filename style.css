@@ -1,0 +1,122 @@
+/* ---------- General ---------- */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  background: #111827;
+  color: #f8fafc;
+  font-family: Arial, Helvetica, sans-serif;
+
+  display: flex;
+  justify-content: center;
+  align-items: center;
+
+  min-height: 100vh;
+}
+
+/* ---------- Phone Container ---------- */
+
+.game-shell {
+  width: 100%;
+  max-width: 430px;
+
+  padding: 24px;
+}
+
+/* ---------- Header ---------- */
+
+.game-header {
+  text-align: center;
+  margin-bottom: 28px;
+}
+
+.logo {
+  font-size: 3rem;
+  font-weight: 300;
+  letter-spacing: 4px;
+}
+
+.level-label {
+  margin-top: 8px;
+  color: #94a3b8;
+}
+
+/* ---------- Game Board ---------- */
+
+.game-board {
+
+  width: 100%;
+  aspect-ratio: 1;
+
+  background: #1e293b;
+
+  border-radius: 18px;
+
+  padding: 10px;
+
+  display: grid;
+
+  grid-template-columns: repeat(5, 1fr);
+  grid-template-rows: repeat(5, 1fr);
+
+  gap: 8px;
+
+  margin-bottom: 20px;
+  
+    .tile {
+
+  background: #334155;
+
+  border-radius: 8px;
+
+  transition: background .2s;
+}
+}
+
+/* ---------- Message ---------- */
+
+.game-message {
+  text-align: center;
+  margin-bottom: 24px;
+  color: #cbd5e1;
+}
+
+/* ---------- Buttons ---------- */
+
+.game-controls {
+  display: flex;
+  gap: 12px;
+}
+
+.game-controls button {
+  flex: 1;
+
+  padding: 14px;
+
+  border: none;
+  border-radius: 10px;
+
+  background: #334155;
+  color: white;
+
+  font-size: 1rem;
+  cursor: pointer;
+
+  transition: background .2s;
+}
+
+.game-controls button:hover {
+  background: #475569;
+}
+
+.tile.start {
+  background: #22c55e;
+}
+
+.tile.goal {
+  background: #3b82f6;
+}

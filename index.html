@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  />
+
+  <title>Trace</title>
+
+  <link rel="stylesheet" href="style.css" />
+</head>
+
+<body>
+  <main class="game-shell">
+    <header class="game-header">
+      <h1 class="logo">Trace</h1>
+      <p class="level-label">Level 1</p>
+    </header>
+
+    <section class="game-board" aria-label="Trace puzzle board">
+      <!-- The puzzle grid will be generated here with JavaScript. -->
+    </section>
+
+    <p class="game-message">
+      Start at the green tile and reach the goal.
+    </p>
+
+    <div class="game-controls">
+      <button id="undo-button" type="button">Undo</button>
+      <button id="restart-button" type="button">Restart</button>
+    </div>
+  </main>
+
+
+  
+  <script src="levels.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
