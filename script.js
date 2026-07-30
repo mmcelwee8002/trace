@@ -98,18 +98,18 @@ function handlePointerMove(event) {
     );
 }
 
+function handlePointerUp() {
+
+    isDrawing = false;
+
+}
+
 function tryAddTile(tile) {
     console.log(
         "Trying to add:",
         tile.dataset.row,
         tile.dataset.col
     );
-}
-
-function handlePointerUp() {
-
-    isDrawing = false;
-
 }
 
 document.addEventListener(

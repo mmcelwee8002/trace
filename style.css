@@ -48,33 +48,29 @@ body {
 /* ---------- Game Board ---------- */
 
 .game-board {
+    width: 100%;
+    aspect-ratio: 1;
 
-  width: 100%;
-  aspect-ratio: 1;
+    background: #1e293b;
 
-  background: #1e293b;
+    border-radius: 18px;
+    padding: 10px;
 
-  border-radius: 18px;
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    grid-template-rows: repeat(5, 1fr);
 
-  padding: 10px;
+    touch-action: none;
+    gap: 8px;
 
-  display: grid;
-
-  grid-template-columns: repeat(5, 1fr);
-  grid-template-rows: repeat(5, 1fr);
-touch-action: none;
-  gap: 8px;
-
-  margin-bottom: 20px;
-  
-    .tile {
-
-  background: #334155;
-
-  border-radius: 8px;
-
-  transition: background .2s;
+    margin-bottom: 20px;
 }
+
+.tile {
+    background: #334155;
+    border-radius: 8px;
+
+    transition: background-color 0.1s ease;
 }
 
 /* ---------- Message ---------- */
