@@ -11,6 +11,12 @@ const BOARD_SIZE = 5;
 
 const level = levels[0];
 
+// ======================================
+// Game State
+// ======================================
+
+let currentPath = [];
+let isDrawing = false;
 
 const board = document.querySelector(".game-board");
 
@@ -25,6 +31,9 @@ function createBoard() {
 
       tile.dataset.row = row;
       tile.dataset.col = col;
+
+tile.addEventListener("pointerdown", handlePointerDown);
+
 
       // Start tile
       if (row === level.start[0] && col === level.start[1]) {
@@ -42,3 +51,73 @@ function createBoard() {
 }
 
 createBoard();
+
+// ======================================
+// Input
+// ======================================
+
+function handlePointerDown(event) {
+        const tile = event.target;
+
+        console.log(
+        `Pointer down at: row ${tile.dataset.row}, col ${tile.dataset.col}`);
+
+    if (!tile.classList.contains("start")) {
+        return;
+    }
+
+    isDrawing = true;
+
+currentPath = [
+    {
+        row: Number(tile.dataset.row),
+        col: Number(tile.dataset.col)
+    }
+];
+
+tile.classList.add("path");
+
+console.log(currentPath);
+}
+
+function handlePointerMove(event) {
+    if (!isDrawing) {
+        return;
+    }
+
+    const tile = document
+        .elementFromPoint(event.clientX, event.clientY)
+        ?.closest(".tile");
+
+    if (!tile) {
+        return;
+    }
+
+    console.log(
+        tryAddTile(tile)
+    );
+}
+
+function tryAddTile(tile) {
+    console.log(
+        "Trying to add:",
+        tile.dataset.row,
+        tile.dataset.col
+    );
+}
+
+function handlePointerUp() {
+
+    isDrawing = false;
+
+}
+
+document.addEventListener(
+    "pointermove",
+    handlePointerMove
+);
+
+document.addEventListener(
+    "pointerup",
+    handlePointerUp
+);

@@ -62,7 +62,7 @@ body {
 
   grid-template-columns: repeat(5, 1fr);
   grid-template-rows: repeat(5, 1fr);
-
+touch-action: none;
   gap: 8px;
 
   margin-bottom: 20px;
@@ -119,4 +119,9 @@ body {
 
 .tile.goal {
   background: #3b82f6;
+}
+
+.tile.path {
+    outline: 3px solid white;
+    outline-offset: -3px;
 }
