@@ -121,3 +121,11 @@ body {
     outline: 3px solid white;
     outline-offset: -3px;
 }
+
+.level-message {
+    min-height: 28px;
+    margin-bottom: 16px;
+
+    text-align: center;
+    font-weight: 600;
+}

@@ -20,6 +20,8 @@ let isDrawing = false;
 let levelComplete = false;
 
 const board = document.querySelector(".game-board");
+const levelMessage =
+document.querySelector(".level-message");
 
 function createBoard() {
   board.innerHTML = "";
@@ -158,6 +160,8 @@ function tryAddTile(tile) {
     isDrawing = false;
 
     console.log("Level Complete!");
+    levelMessage.textContent =
+    "Level Complete!";
 }
 
 
