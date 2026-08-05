@@ -17,6 +17,7 @@ const level = levels[0];
 
 let currentPath = [];
 let isDrawing = false;
+let levelComplete = false;
 
 const board = document.querySelector(".game-board");
 
@@ -99,17 +100,68 @@ function handlePointerMove(event) {
 }
 
 function handlePointerUp() {
+    if (!isDrawing) {
+        return;
+    }
 
     isDrawing = false;
+
+    if (levelComplete) {
+        return;
+    }
+
+    document
+        .querySelectorAll(".tile.path")
+        .forEach(tile => {
+            tile.classList.remove("path");
+        });
+
+    currentPath = [];
+}
+
+function isAdjacent(lastTile, newTile) {
+
+    const rowDifference =
+        Math.abs(lastTile.row - newTile.row);
+
+    const colDifference =
+        Math.abs(lastTile.col - newTile.col);
+
+    return rowDifference + colDifference === 1;
 
 }
 
 function tryAddTile(tile) {
-    console.log(
-        "Trying to add:",
-        tile.dataset.row,
-        tile.dataset.col
-    );
+    // Don't add the same tile twice
+    if (tile.classList.contains("path")) {
+        return;
+    }
+
+    const newTile = {
+        row: Number(tile.dataset.row),
+        col: Number(tile.dataset.col)
+    };
+
+    const lastTile =
+        currentPath[currentPath.length - 1];
+
+    // Only allow one tile up, down, left, or right
+    if (!isAdjacent(lastTile, newTile)) {
+        return;
+    }
+
+    tile.classList.add("path");
+    currentPath.push(newTile);
+
+    if (tile.classList.contains("goal")) {
+    levelComplete = true;
+    isDrawing = false;
+
+    console.log("Level Complete!");
+}
+
+
+    console.log(currentPath);
 }
 
 document.addEventListener(
