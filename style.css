@@ -48,6 +48,9 @@ body {
 /* ---------- Game Board ---------- */
 
 .game-board {
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
     width: 100%;
     aspect-ratio: 1;
 
@@ -71,6 +74,8 @@ body {
     border-radius: 8px;
 
     transition: background-color 0.1s ease;
+    user-select: none;
+    -webkit-user-drag: none;
 }
 
 /* ---------- Message ---------- */

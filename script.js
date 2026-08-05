@@ -22,6 +22,8 @@ let levelComplete = false;
 const board = document.querySelector(".game-board");
 const levelMessage =
 document.querySelector(".level-message");
+const restartButton =
+    document.querySelector(".restart-button");
 
 function createBoard() {
   board.innerHTML = "";
@@ -60,6 +62,7 @@ createBoard();
 // ======================================
 
 function handlePointerDown(event) {
+        event.preventDefault();
         const tile = event.target;
 
         console.log(
@@ -134,15 +137,38 @@ function isAdjacent(lastTile, newTile) {
 }
 
 function tryAddTile(tile) {
-    // Don't add the same tile twice
-    if (tile.classList.contains("path")) {
-        return;
-    }
-
     const newTile = {
         row: Number(tile.dataset.row),
         col: Number(tile.dataset.col)
     };
+
+    // Check whether this tile is already in the path
+    const existingIndex = currentPath.findIndex(pathTile =>
+        pathTile.row === newTile.row &&
+        pathTile.col === newTile.col
+    );
+
+    if (existingIndex !== -1) {
+        const previousTileIndex =
+            currentPath.length - 2;
+
+        // Moving back onto the previous tile removes the last step
+        if (existingIndex === previousTileIndex) {
+            const removedTile =
+                currentPath.pop();
+
+            const removedTileElement =
+                document.querySelector(
+                    `.tile[data-row="${removedTile.row}"][data-col="${removedTile.col}"]`
+                );
+
+            removedTileElement.classList.remove("path");
+
+            console.log("Backtracked");
+        }
+
+        return;
+    }
 
     const lastTile =
         currentPath[currentPath.length - 1];
@@ -156,16 +182,35 @@ function tryAddTile(tile) {
     currentPath.push(newTile);
 
     if (tile.classList.contains("goal")) {
-    levelComplete = true;
-    isDrawing = false;
+        levelComplete = true;
+        isDrawing = false;
 
-    console.log("Level Complete!");
-    levelMessage.textContent =
-    "Level Complete!";
+        console.log("Level Complete!");
+
+        levelMessage.textContent =
+            "Level Complete!";
+    }
+
+    console.log(currentPath);
 }
 
 
-    console.log(currentPath);
+// ======================================
+// Restart Level
+// ======================================
+
+function restartLevel() {
+    isDrawing = false;
+    levelComplete = false;
+    currentPath = [];
+
+    document
+        .querySelectorAll(".tile.path")
+        .forEach(tile => {
+            tile.classList.remove("path");
+        });
+
+    levelMessage.textContent = "";
 }
 
 document.addEventListener(
@@ -176,4 +221,8 @@ document.addEventListener(
 document.addEventListener(
     "pointerup",
     handlePointerUp
+);
+restartButton.addEventListener(
+    "click",
+    restartLevel
 );
