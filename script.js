@@ -106,17 +106,16 @@ function handlePointerMove(event) {
         return;
     }
 
-    const tile = document
-        .elementFromPoint(event.clientX, event.clientY)
-        ?.closest(".tile");
+const tile = document
+    .elementFromPoint(event.clientX, event.clientY)
+    ?.closest(".tile");
 
-    if (!tile) {
-        return;
-    }
+if (!tile) {
+    return;
+}
 
-    console.log(
-        tryAddTile(tile)
-    );
+tryAddTile(tile);
+    
 }
 
 function handlePointerUp() {
