@@ -9,7 +9,8 @@
 
 const BOARD_SIZE = 5;
 
-const level = levels[0];
+let currentLevelIndex = 0;
+let level = levels[currentLevelIndex];
 
 // ======================================
 // Game State
@@ -24,12 +25,26 @@ const levelMessage =
 document.querySelector(".level-message");
 const restartButton =
     document.querySelector(".restart-button");
+const nextButton =
+    document.querySelector(".next-button");
+
+const levelNumber =
+    document.querySelector(".level-number");    
 
 function createBoard() {
   board.innerHTML = "";
 
-  for (let row = 0; row < BOARD_SIZE; row++) {
-    for (let col = 0; col < BOARD_SIZE; col++) {
+levelNumber.textContent =
+    `Level ${currentLevelIndex + 1}`;  
+
+board.style.gridTemplateColumns =
+    `repeat(${level.size}, 1fr)`;
+
+board.style.gridTemplateRows =
+    `repeat(${level.size}, 1fr)`;
+
+ for (let row = 0; row < level.size; row++) {
+    for (let col = 0; col < level.size; col++) {
       const tile = document.createElement("div");
 
       tile.classList.add("tile");
@@ -213,6 +228,20 @@ function restartLevel() {
     levelMessage.textContent = "";
 }
 
+function loadNextLevel() {
+    currentLevelIndex++;
+
+    if (currentLevelIndex >= levels.length) {
+        currentLevelIndex = 0;
+    }
+
+    level = levels[currentLevelIndex];
+
+    restartLevel();
+    createBoard();
+}
+
+
 document.addEventListener(
     "pointermove",
     handlePointerMove
@@ -225,4 +254,8 @@ document.addEventListener(
 restartButton.addEventListener(
     "click",
     restartLevel
+);
+nextButton.addEventListener(
+    "click",
+    loadNextLevel
 );
