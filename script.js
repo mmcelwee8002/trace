@@ -55,6 +55,18 @@ board.style.gridTemplateRows =
 
       tile.classList.add("tile");
 
+   const isWall =
+    level.walls.some(
+        wall =>
+            wall[0] === row &&
+            wall[1] === col
+    );
+
+if (isWall) {
+    tile.classList.add("wall");
+    
+}   
+
       tile.dataset.row = row;
       tile.dataset.col = col;
 
@@ -161,6 +173,10 @@ function tryAddTile(tile) {
         row: Number(tile.dataset.row),
         col: Number(tile.dataset.col)
     };
+
+if (tile.classList.contains("wall")) {
+    return;
+}
 
     // Check whether this tile is already in the path
     const existingIndex = currentPath.findIndex(pathTile =>

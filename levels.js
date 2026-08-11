@@ -22,7 +22,9 @@ const levels = [
         size: 5,
         start: [4, 0],
         goal: [0, 4],
-        walls: [],
+        walls: [
+            [2, 2]
+        ],
         optimalLength: 9
     }
 ];
