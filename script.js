@@ -30,12 +30,18 @@ const nextButton =
 
 const levelNumber =
     document.querySelector(".level-number");    
+    
+const levelTitle =
+    document.querySelector(".level-title");
 
 function createBoard() {
   board.innerHTML = "";
 
 levelNumber.textContent =
     `Level ${currentLevelIndex + 1}`;  
+
+levelTitle.textContent =
+    level.title;    
 
 board.style.gridTemplateColumns =
     `repeat(${level.size}, 1fr)`;
