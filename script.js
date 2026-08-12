@@ -19,6 +19,7 @@ let level = levels[currentLevelIndex];
 let currentPath = [];
 let isDrawing = false;
 let levelComplete = false;
+let bestMovesByLevel = {};
 
 const board = document.querySelector(".game-board");
 const levelMessage =
@@ -86,6 +87,13 @@ tile.addEventListener("pointerdown", handlePointerDown);
       board.appendChild(tile);
     }
   }
+
+// Temporary test: calculate shortest possible route
+console.log(
+    "Optimal moves:",
+    findShortestPathLength(level));
+
+
 }
 
 createBoard();
@@ -174,6 +182,93 @@ function isAdjacent(lastTile, newTile) {
 
 }
 
+//shortest path
+
+function findShortestPathLength(level) {
+    const start = level.start;
+    const goal = level.goal;
+
+    const queue = [
+        {
+            row: start[0],
+            col: start[1],
+            moves: 0
+        }
+    ];
+
+    const visited = new Set();
+
+    visited.add(`${start[0]},${start[1]}`);
+
+    while (queue.length > 0) {
+        const current = queue.shift();
+
+        // Reached the goal
+        if (
+            current.row === goal[0] &&
+            current.col === goal[1]
+        ) {
+            return current.moves;
+        }
+
+        // Up, down, left, right
+        const directions = [
+            [-1, 0],
+            [1, 0],
+            [0, -1],
+            [0, 1]
+        ];
+
+        for (const direction of directions) {
+            const newRow =
+                current.row + direction[0];
+
+            const newCol =
+                current.col + direction[1];
+
+            // Stay inside the board
+            if (
+                newRow < 0 ||
+                newRow >= level.size ||
+                newCol < 0 ||
+                newCol >= level.size
+            ) {
+                continue;
+            }
+
+            // Don't walk through walls
+            const isWall = level.walls.some(
+                wall =>
+                    wall[0] === newRow &&
+                    wall[1] === newCol
+            );
+
+            if (isWall) {
+                continue;
+            }
+
+            const key = `${newRow},${newCol}`;
+
+            // Don't check the same tile twice
+            if (visited.has(key)) {
+                continue;
+            }
+
+            visited.add(key);
+
+            queue.push({
+                row: newRow,
+                col: newCol,
+                moves: current.moves + 1
+            });
+        }
+    }
+
+    // No possible route
+    return null;
+}
+
+
 function tryAddTile(tile) {
     const newTile = {
         row: Number(tile.dataset.row),
@@ -223,19 +318,42 @@ if (tile.classList.contains("wall")) {
     tile.classList.add("path");
     currentPath.push(newTile);
 
-    if (tile.classList.contains("goal")) {
-        levelComplete = true;
-        isDrawing = false;
+ if (tile.classList.contains("goal")) {
+    levelComplete = true;
+    isDrawing = false;
 
-        console.log("Level Complete!");
+    const playerMoves =
+        currentPath.length - 1;
 
-        levelMessage.textContent =
-            "Level Complete!";
+    const optimalMoves =
+        findShortestPathLength(level);
+
+    const levelId =
+        level.id;
+
+    const previousBest =
+        bestMovesByLevel[levelId];
+
+    if (
+        previousBest === undefined ||
+        playerMoves < previousBest
+    ) {
+        bestMovesByLevel[levelId] =
+            playerMoves;
     }
 
-    console.log(currentPath);
-}
+    const bestMoves =
+        bestMovesByLevel[levelId];
 
+    console.log("Level Complete!");
+    console.log("Player moves:", playerMoves);
+    console.log("Best moves:", bestMoves);
+    console.log("Optimal moves:", optimalMoves);
+
+    levelMessage.textContent =
+        `Level Complete! Best: ${bestMoves} | Optimal: ${optimalMoves}`;
+}
+}
 
 // ======================================
 // Restart Level
