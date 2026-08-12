@@ -124,13 +124,19 @@ function handlePointerMove(event) {
         return;
     }
 
-const tile = document
-    .elementFromPoint(event.clientX, event.clientY)
-    ?.closest(".tile");
+    const element = document.elementFromPoint(
+        event.clientX,
+        event.clientY
+    );
+    
+    const tile = element
+        ? element.closest(".tile")
+        : null;
 
 if (!tile) {
     return;
 }
+
 
 tryAddTile(tile);
     
