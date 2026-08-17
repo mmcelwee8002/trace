@@ -112,7 +112,7 @@ tile.addEventListener("pointerdown", handlePointerDown);
       board.appendChild(tile);
     }
   }
-
+updateNavigationButtons();
 }
 
 createBoard();
@@ -142,7 +142,6 @@ currentPath = [
 
 tile.classList.add("path");
 
-updateNavigationButtons();
 }
 
 

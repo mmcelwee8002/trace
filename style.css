@@ -140,11 +140,10 @@ body {
     font-weight: 600;
 }
 
-.previous-button:disabled,
-.next-button:disabled,
-.previous-button:disabled:hover,
-.next-button:disabled:hover {
-    opacity: 0.35;
+.game-controls button:disabled,
+.game-controls button:disabled:hover {
+    background: #1e293b;
+    color: #64748b;
+    opacity: 0.5;
     cursor: not-allowed;
-    transform: none;
 }
