@@ -341,12 +341,17 @@ if (tile.classList.contains("wall")) {
     const previousBest =
         bestMovesByLevel[levelId];
 
+const isNewBest =
+    previousBest === undefined ||
+    playerMoves < previousBest;
+
     if (
         previousBest === undefined ||
         playerMoves < previousBest
-    ) {
-        bestMovesByLevel[levelId] =
-            playerMoves;
+    ) 
+  if (isNewBest) {
+    bestMovesByLevel[levelId] =
+        playerMoves;
 
     localStorage.setItem(
     "traceBestMoves",
@@ -357,8 +362,16 @@ if (tile.classList.contains("wall")) {
     const bestMoves =
         bestMovesByLevel[levelId];
 
+if (playerMoves === optimalMoves) {
     levelMessage.textContent =
-        `Level Complete! Best: ${bestMoves} | Optimal: ${optimalMoves}`;
+        `Perfect! Moves: ${playerMoves} | Best: ${bestMoves} | Optimal: ${optimalMoves}`;
+} else if (isNewBest) {
+    levelMessage.textContent =
+        `New Best! Moves: ${playerMoves} | Best: ${bestMoves} | Optimal: ${optimalMoves}`;
+} else {
+    levelMessage.textContent =
+        `Level Complete! Moves: ${playerMoves} | Best: ${bestMoves} | Optimal: ${optimalMoves}`;
+}
 }
 }
 
