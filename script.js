@@ -105,12 +105,6 @@ tile.addEventListener("pointerdown", handlePointerDown);
     }
   }
 
-// Temporary test: calculate shortest possible route
-console.log(
-    "Optimal moves:",
-    findShortestPathLength(level));
-
-
 }
 
 createBoard();
@@ -123,8 +117,7 @@ function handlePointerDown(event) {
         event.preventDefault();
         const tile = event.target;
 
-        console.log(
-        `Pointer down at: row ${tile.dataset.row}, col ${tile.dataset.col}`);
+
 
     if (!tile.classList.contains("start")) {
         return;
@@ -140,8 +133,6 @@ currentPath = [
 ];
 
 tile.classList.add("path");
-
-console.log(currentPath);
 }
 
 function handlePointerMove(event) {
@@ -318,8 +309,7 @@ if (tile.classList.contains("wall")) {
 
             removedTileElement.classList.remove("path");
 
-            console.log("Backtracked");
-        }
+            }
 
         return;
     }
