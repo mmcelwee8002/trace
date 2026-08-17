@@ -19,7 +19,10 @@ let level = levels[currentLevelIndex];
 let currentPath = [];
 let isDrawing = false;
 let levelComplete = false;
-let bestMovesByLevel = {};
+let bestMovesByLevel =
+    JSON.parse(
+        localStorage.getItem("traceBestMoves")
+    ) || {};
 
 const board = document.querySelector(".game-board");
 const levelMessage =
@@ -43,6 +46,20 @@ levelNumber.textContent =
 
 levelTitle.textContent =
     level.title;    
+
+const savedBest =
+    bestMovesByLevel[level.id];
+
+const optimalMoves =
+    findShortestPathLength(level);
+
+if (savedBest !== undefined) {
+    levelMessage.textContent =
+        `Best: ${savedBest} | Optimal: ${optimalMoves}`;
+} else {
+    levelMessage.textContent =
+        `Optimal: ${optimalMoves}`;
+}
 
 board.style.gridTemplateColumns =
     `repeat(${level.size}, 1fr)`;
@@ -340,15 +357,15 @@ if (tile.classList.contains("wall")) {
     ) {
         bestMovesByLevel[levelId] =
             playerMoves;
+
+    localStorage.setItem(
+    "traceBestMoves",
+    JSON.stringify(bestMovesByLevel)
+    );
     }
 
     const bestMoves =
         bestMovesByLevel[levelId];
-
-    console.log("Level Complete!");
-    console.log("Player moves:", playerMoves);
-    console.log("Best moves:", bestMoves);
-    console.log("Optimal moves:", optimalMoves);
 
     levelMessage.textContent =
         `Level Complete! Best: ${bestMoves} | Optimal: ${optimalMoves}`;
