@@ -11,6 +11,10 @@ const BOARD_SIZE = 5;
 
 let currentLevelIndex = 0;
 let level = levels[currentLevelIndex];
+let highestUnlockedLevel =
+    Number(
+        localStorage.getItem("traceHighestUnlockedLevel")
+    ) || 0;
 
 // ======================================
 // Game State
@@ -29,6 +33,10 @@ const levelMessage =
 document.querySelector(".level-message");
 const restartButton =
     document.querySelector(".restart-button");
+
+const previousButton =
+    document.querySelector(".previous-button");
+
 const nextButton =
     document.querySelector(".next-button");
 
@@ -133,7 +141,10 @@ currentPath = [
 ];
 
 tile.classList.add("path");
+
+updateNavigationButtons();
 }
+
 
 function handlePointerMove(event) {
     if (!isDrawing) {
@@ -338,6 +349,15 @@ if (tile.classList.contains("wall")) {
     const levelId =
         level.id;
 
+if (currentLevelIndex === highestUnlockedLevel) {
+    highestUnlockedLevel++;
+
+    localStorage.setItem(
+        "traceHighestUnlockedLevel",
+        highestUnlockedLevel
+    );
+}
+
     const previousBest =
         bestMovesByLevel[levelId];
 
@@ -394,10 +414,12 @@ function restartLevel() {
 }
 
 function loadNextLevel() {
-    currentLevelIndex++;
+    if (currentLevelIndex < highestUnlockedLevel) {
+        currentLevelIndex++;
+    }
 
     if (currentLevelIndex >= levels.length) {
-        currentLevelIndex = 0;
+        currentLevelIndex = levels.length - 1;
     }
 
     level = levels[currentLevelIndex];
@@ -405,6 +427,26 @@ function loadNextLevel() {
     restartLevel();
     createBoard();
 }
+
+function loadPreviousLevel() {
+    if (currentLevelIndex > 0) {
+        currentLevelIndex--;
+    }
+
+    level = levels[currentLevelIndex];
+
+    restartLevel();
+    createBoard();
+}
+
+function updateNavigationButtons() {
+    previousButton.disabled =
+        currentLevelIndex === 0;
+
+    nextButton.disabled =
+        currentLevelIndex === highestUnlockedLevel;
+}
+
 
 
 document.addEventListener(
@@ -423,4 +465,8 @@ restartButton.addEventListener(
 nextButton.addEventListener(
     "click",
     loadNextLevel
+);
+previousButton.addEventListener(
+    "click",
+    loadPreviousLevel
 );
