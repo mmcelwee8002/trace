@@ -387,7 +387,10 @@ const isNewBest =
     const bestMoves =
         bestMovesByLevel[levelId];
 
-if (playerMoves === optimalMoves) {
+if (currentLevelIndex === levels.length - 1) {
+    levelMessage.textContent =
+        `All Levels Complete! Moves: ${playerMoves} | Best: ${bestMoves} | Optimal: ${optimalMoves}`;
+} else if (playerMoves === optimalMoves) {
     levelMessage.textContent =
         `Perfect! Moves: ${playerMoves} | Best: ${bestMoves} | Optimal: ${optimalMoves}`;
 } else if (isNewBest) {
