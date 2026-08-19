@@ -449,7 +449,8 @@ function updateNavigationButtons() {
         currentLevelIndex === 0;
 
     nextButton.disabled =
-        currentLevelIndex === highestUnlockedLevel;
+    currentLevelIndex >= highestUnlockedLevel ||
+    currentLevelIndex >= levels.length - 1;
 }
 
 
