@@ -12,9 +12,12 @@ const BOARD_SIZE = 5;
 let currentLevelIndex = 0;
 let level = levels[currentLevelIndex];
 let highestUnlockedLevel =
-    Number(
-        localStorage.getItem("traceHighestUnlockedLevel")
-    ) || 0;
+    Math.min(
+        Number(
+            localStorage.getItem("traceHighestUnlockedLevel")
+        ) || 0,
+        levels.length - 1
+    );
 
 // ======================================
 // Game State
