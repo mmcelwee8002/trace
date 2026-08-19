@@ -115,7 +115,7 @@ const levels = [
 },
 
 {
-    id: "1-06",
+    id: "1-05",
     title: "The Long Way",
     size: 15,
     start: [14, 0],

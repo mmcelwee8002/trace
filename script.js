@@ -363,6 +363,8 @@ if (
     );
 }
 
+updateNavigationButtons();
+
     const previousBest =
         bestMovesByLevel[levelId];
 
