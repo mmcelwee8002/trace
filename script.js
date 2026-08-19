@@ -348,7 +348,10 @@ if (tile.classList.contains("wall")) {
     const levelId =
         level.id;
 
-if (currentLevelIndex === highestUnlockedLevel) {
+if (
+    currentLevelIndex === highestUnlockedLevel &&
+    highestUnlockedLevel < levels.length - 1
+) {
     highestUnlockedLevel++;
 
     localStorage.setItem(
