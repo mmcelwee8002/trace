@@ -54,7 +54,7 @@ body {
     width: 100%;
     aspect-ratio: 1;
 
-    background: #1e293b;
+    background: #273449;
 
     border-radius: 18px;
     padding: 10px;
@@ -70,7 +70,7 @@ body {
 }
 
 .tile {
-    background: #334155;
+    background: #475569;
     border-radius: 8px;
 
     transition: background-color 0.1s ease;
@@ -79,8 +79,8 @@ body {
 }
 
 .tile.wall {
-    background: #020617;
-    border: 2px solid #475569;
+    background: #312e81;
+    border: 2px solid #6366f1;
 }
 
 /* ---------- Message ---------- */
