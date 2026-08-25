@@ -237,7 +237,10 @@ function findShortestPathLength(level) {
         row: start[0],
         col: start[1],
         moves: 0,
-        hasKey: false
+        hasKey: false,
+        path: new Set([
+            `${start[0]},${start[1]}`
+        ])
     }
 ];
 
@@ -306,6 +309,13 @@ if (isLocked && !current.hasKey) {
     continue;
 }
 
+const pathKey =
+    `${newRow},${newCol}`;
+
+if (current.path.has(pathKey)) {
+    continue;
+}
+
 const foundKey =
     current.hasKey ||
     (
@@ -324,14 +334,20 @@ if (visited.has(key)) {
 
 visited.add(key);
 
+const newPath =
+    new Set(current.path);
+
+newPath.add(pathKey);
+
 queue.push({
     row: newRow,
     col: newCol,
     moves: current.moves + 1,
-    hasKey: foundKey
-});
-        }
-    }
+    hasKey: foundKey,
+    path: newPath
+        });
+}
+}
 
     // No possible route
     return null;
