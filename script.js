@@ -232,17 +232,20 @@ function findShortestPathLength(level) {
     const start = level.start;
     const goal = level.goal;
 
-    const queue = [
-        {
-            row: start[0],
-            col: start[1],
-            moves: 0
-        }
-    ];
+   const queue = [
+    {
+        row: start[0],
+        col: start[1],
+        moves: 0,
+        hasKey: false
+    }
+];
 
     const visited = new Set();
 
-    visited.add(`${start[0]},${start[1]}`);
+    visited.add(
+    `${start[0]},${start[1]},false`
+);
 
     while (queue.length > 0) {
         const current = queue.shift();
@@ -288,23 +291,45 @@ function findShortestPathLength(level) {
             );
 
             if (isWall) {
-                continue;
+            continue;
             }
 
-            const key = `${newRow},${newCol}`;
+        const isLocked =
+        level.locks &&
+        level.locks.some(
+        lock =>
+            lock[0] === newRow &&
+            lock[1] === newCol
+    );
 
-            // Don't check the same tile twice
-            if (visited.has(key)) {
-                continue;
-            }
+if (isLocked && !current.hasKey) {
+    continue;
+}
 
-            visited.add(key);
+const foundKey =
+    current.hasKey ||
+    (
+        level.key &&
+        newRow === level.key[0] &&
+        newCol === level.key[1]
+    );
 
-            queue.push({
-                row: newRow,
-                col: newCol,
-                moves: current.moves + 1
-            });
+const key =
+    `${newRow},${newCol},${foundKey}`;
+
+// Don't check the same tile twice
+if (visited.has(key)) {
+    continue;
+}
+
+visited.add(key);
+
+queue.push({
+    row: newRow,
+    col: newCol,
+    moves: current.moves + 1,
+    hasKey: foundKey
+});
         }
     }
 
