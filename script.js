@@ -30,6 +30,7 @@ let bestMovesByLevel =
     JSON.parse(
         localStorage.getItem("traceBestMoves")
     ) || {};
+let hasKey = false;
 
 const board = document.querySelector(".game-board");
 const levelMessage =
@@ -111,6 +112,28 @@ tile.addEventListener("pointerdown", handlePointerDown);
       if (row === level.goal[0] && col === level.goal[1]) {
         tile.classList.add("goal");
       }
+
+      // Key tile
+if (
+    level.key &&
+    row === level.key[0] &&
+    col === level.key[1]
+) {
+    tile.classList.add("key");
+}
+
+// Locked tile
+if (
+    level.locks &&
+    level.locks.some(
+        lock =>
+            lock[0] === row &&
+            lock[1] === col
+    )
+) {
+    tile.classList.add("lock");
+}
+
 
       board.appendChild(tile);
     }
@@ -300,6 +323,13 @@ if (tile.classList.contains("wall")) {
     return;
 }
 
+if (
+    tile.classList.contains("lock") &&
+    !hasKey
+) {
+    return;
+}
+
     // Check whether this tile is already in the path
     const existingIndex = currentPath.findIndex(pathTile =>
         pathTile.row === newTile.row &&
@@ -337,6 +367,16 @@ if (tile.classList.contains("wall")) {
 
     tile.classList.add("path");
     currentPath.push(newTile);
+
+if (tile.classList.contains("key")) {
+    hasKey = true;
+
+    document
+        .querySelectorAll(".tile.lock")
+        .forEach(lockTile => {
+            lockTile.classList.add("unlocked");
+        });
+}
 
  if (tile.classList.contains("goal")) {
     levelComplete = true;
@@ -413,6 +453,13 @@ function restartLevel() {
     isDrawing = false;
     levelComplete = false;
     currentPath = [];
+    hasKey = false;
+
+    document
+    .querySelectorAll(".tile.lock")
+    .forEach(lockTile => {
+        lockTile.classList.remove("unlocked");
+    });
 
     document
         .querySelectorAll(".tile.path")
