@@ -31,6 +31,7 @@ let bestMovesByLevel =
         localStorage.getItem("traceBestMoves")
     ) || {};
 let hasKey = false;
+let collectedKeys = new Set();
 
 const board = document.querySelector(".game-board");
 const levelMessage =
@@ -122,6 +123,21 @@ function createBoard() {
                 tile.classList.add("key");
             }
 
+            // Multiple key tiles
+            if (level.keys) {
+                level.keys.forEach(key => {
+                    const isThisKey =
+                        key.position[0] === row &&
+                        key.position[1] === col;
+
+                    if (isThisKey) {
+                        tile.classList.add("key");
+                        tile.dataset.keyId = key.id;
+                    }
+                });
+            }
+
+
             // Locked tile
             if (
                 level.locks &&
@@ -133,7 +149,21 @@ function createBoard() {
             ) {
                 tile.classList.add("lock");
             }
+            if (level.lockGroups) {
+                level.lockGroups.forEach(group => {
+                    const isThisLock =
+                        group.tiles.some(
+                            lock =>
+                                lock[0] === row &&
+                                lock[1] === col
+                        );
 
+                    if (isThisLock) {
+                        tile.classList.add("lock");
+                        tile.dataset.keyId = group.keyId;
+                    }
+                });
+            }
 
             board.appendChild(tile);
         }
@@ -211,6 +241,7 @@ function handlePointerUp() {
             tile.classList.remove("path");
         });
     hasKey = false;
+    collectedKeys.clear();
 
     document
         .querySelectorAll(".tile.lock")
@@ -245,6 +276,7 @@ function findShortestPathLength(level) {
             col: start[1],
             moves: 0,
             hasKey: false,
+            collectedKeys: new Set(),
             path: new Set([
                 `${start[0]},${start[1]}`
             ])
@@ -315,6 +347,27 @@ function findShortestPathLength(level) {
             if (isLocked && !current.hasKey) {
                 continue;
             }
+            if (level.lockGroups) {
+                const matchingLockGroup =
+                    level.lockGroups.find(
+                        group =>
+                            group.tiles.some(
+                                lock =>
+                                    lock[0] === newRow &&
+                                    lock[1] === newCol
+                            )
+                    );
+
+                if (
+                    matchingLockGroup &&
+                    !current.collectedKeys.has(
+                        matchingLockGroup.keyId
+                    )
+                ) {
+                    continue;
+                }
+            }
+
 
             const pathKey =
                 `${newRow},${newCol}`;
@@ -331,8 +384,31 @@ function findShortestPathLength(level) {
                     newCol === level.key[1]
                 );
 
+            const newCollectedKeys =
+                new Set(current.collectedKeys);
+
+            if (level.keys) {
+                const foundMultiKey =
+                    level.keys.find(
+                        key =>
+                            key.position[0] === newRow &&
+                            key.position[1] === newCol
+                    );
+
+                if (foundMultiKey) {
+                    newCollectedKeys.add(
+                        foundMultiKey.id
+                    );
+                }
+            }
+
+            const collectedKeyState =
+                [...newCollectedKeys]
+                    .sort()
+                    .join("-");
+
             const key =
-                `${newRow},${newCol},${foundKey}`;
+                `${newRow},${newCol},${foundKey},${collectedKeyState}`;
 
             // Don't check the same tile twice
             if (visited.has(key)) {
@@ -351,6 +427,7 @@ function findShortestPathLength(level) {
                 col: newCol,
                 moves: current.moves + 1,
                 hasKey: foundKey,
+                collectedKeys: newCollectedKeys,
                 path: newPath
             });
         }
@@ -371,12 +448,23 @@ function tryAddTile(tile) {
         return;
     }
 
+   if (
+    tile.classList.contains("lock") &&
+    !tile.dataset.keyId &&
+    !hasKey
+) {
+    return;
+}
+
     if (
         tile.classList.contains("lock") &&
-        !hasKey
+        tile.dataset.keyId &&
+        !collectedKeys.has(tile.dataset.keyId)
     ) {
         return;
     }
+
+
 
     // Check whether this tile is already in the path
     const existingIndex = currentPath.findIndex(pathTile =>
@@ -414,6 +502,30 @@ function tryAddTile(tile) {
                     });
             }
 
+            if (level.keys) {
+                const removedKey =
+                    level.keys.find(
+                        key =>
+                            key.position[0] === removedTile.row &&
+                            key.position[1] === removedTile.col
+                    );
+
+                if (removedKey) {
+                    collectedKeys.delete(
+                        removedKey.id
+                    );
+
+                    document
+                        .querySelectorAll(
+                            `.tile.lock[data-key-id="${removedKey.id}"]`
+                        )
+                        .forEach(lockTile => {
+                            lockTile.classList.remove("unlocked");
+                        });
+                }
+            }
+
+
         }
 
         return;
@@ -430,15 +542,38 @@ function tryAddTile(tile) {
     tile.classList.add("path");
     currentPath.push(newTile);
 
-    if (tile.classList.contains("key")) {
-        hasKey = true;
+ if (
+    tile.classList.contains("key") &&
+    !tile.dataset.keyId
+) {
+    hasKey = true;
+
+    document
+        .querySelectorAll(".tile.lock")
+        .forEach(lockTile => {
+            lockTile.classList.add("unlocked");
+        });
+}
+
+    if (
+        tile.classList.contains("key") &&
+        tile.dataset.keyId
+    ) {
+        const keyId =
+            tile.dataset.keyId;
+
+        collectedKeys.add(keyId);
 
         document
-            .querySelectorAll(".tile.lock")
+            .querySelectorAll(
+                `.tile.lock[data-key-id="${keyId}"]`
+            )
             .forEach(lockTile => {
                 lockTile.classList.add("unlocked");
             });
     }
+
+
 
     if (tile.classList.contains("goal")) {
         levelComplete = true;
@@ -516,6 +651,7 @@ function restartLevel() {
     levelComplete = false;
     currentPath = [];
     hasKey = false;
+    collectedKeys.clear();
 
     document
         .querySelectorAll(".tile.lock")
