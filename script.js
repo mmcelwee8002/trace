@@ -34,7 +34,7 @@ let hasKey = false;
 
 const board = document.querySelector(".game-board");
 const levelMessage =
-document.querySelector(".level-message");
+    document.querySelector(".level-message");
 const restartButton =
     document.querySelector(".restart-button");
 
@@ -45,100 +45,100 @@ const nextButton =
     document.querySelector(".next-button");
 
 const levelNumber =
-    document.querySelector(".level-number");    
-    
+    document.querySelector(".level-number");
+
 const levelTitle =
     document.querySelector(".level-title");
 
 function createBoard() {
-  board.innerHTML = "";
+    board.innerHTML = "";
 
-levelNumber.textContent =
-    `Level ${currentLevelIndex + 1}`;  
+    levelNumber.textContent =
+        `Level ${currentLevelIndex + 1}`;
 
-levelTitle.textContent =
-    level.title;    
+    levelTitle.textContent =
+        level.title;
 
-const savedBest =
-    bestMovesByLevel[level.id];
+    const savedBest =
+        bestMovesByLevel[level.id];
 
-const optimalMoves =
-    findShortestPathLength(level);
+    const optimalMoves =
+        findShortestPathLength(level);
 
-if (savedBest !== undefined) {
-    levelMessage.textContent =
-        `Best: ${savedBest} | Optimal: ${optimalMoves}`;
-} else {
-    levelMessage.textContent =
-        `Optimal: ${optimalMoves}`;
-}
-
-board.style.gridTemplateColumns =
-    `repeat(${level.size}, 1fr)`;
-
-board.style.gridTemplateRows =
-    `repeat(${level.size}, 1fr)`;
-
- for (let row = 0; row < level.size; row++) {
-    for (let col = 0; col < level.size; col++) {
-      const tile = document.createElement("div");
-
-      tile.classList.add("tile");
-
-   const isWall =
-    level.walls.some(
-        wall =>
-            wall[0] === row &&
-            wall[1] === col
-    );
-
-if (isWall) {
-    tile.classList.add("wall");
-    
-}   
-
-      tile.dataset.row = row;
-      tile.dataset.col = col;
-
-tile.addEventListener("pointerdown", handlePointerDown);
-
-
-      // Start tile
-      if (row === level.start[0] && col === level.start[1]) {
-        tile.classList.add("start");
-      }
-
-      // Goal tile
-      if (row === level.goal[0] && col === level.goal[1]) {
-        tile.classList.add("goal");
-      }
-
-      // Key tile
-if (
-    level.key &&
-    row === level.key[0] &&
-    col === level.key[1]
-) {
-    tile.classList.add("key");
-}
-
-// Locked tile
-if (
-    level.locks &&
-    level.locks.some(
-        lock =>
-            lock[0] === row &&
-            lock[1] === col
-    )
-) {
-    tile.classList.add("lock");
-}
-
-
-      board.appendChild(tile);
+    if (savedBest !== undefined) {
+        levelMessage.textContent =
+            `Best: ${savedBest} | Optimal: ${optimalMoves}`;
+    } else {
+        levelMessage.textContent =
+            `Optimal: ${optimalMoves}`;
     }
-  }
-updateNavigationButtons();
+
+    board.style.gridTemplateColumns =
+        `repeat(${level.size}, 1fr)`;
+
+    board.style.gridTemplateRows =
+        `repeat(${level.size}, 1fr)`;
+
+    for (let row = 0; row < level.size; row++) {
+        for (let col = 0; col < level.size; col++) {
+            const tile = document.createElement("div");
+
+            tile.classList.add("tile");
+
+            const isWall =
+                level.walls.some(
+                    wall =>
+                        wall[0] === row &&
+                        wall[1] === col
+                );
+
+            if (isWall) {
+                tile.classList.add("wall");
+
+            }
+
+            tile.dataset.row = row;
+            tile.dataset.col = col;
+
+            tile.addEventListener("pointerdown", handlePointerDown);
+
+
+            // Start tile
+            if (row === level.start[0] && col === level.start[1]) {
+                tile.classList.add("start");
+            }
+
+            // Goal tile
+            if (row === level.goal[0] && col === level.goal[1]) {
+                tile.classList.add("goal");
+            }
+
+            // Key tile
+            if (
+                level.key &&
+                row === level.key[0] &&
+                col === level.key[1]
+            ) {
+                tile.classList.add("key");
+            }
+
+            // Locked tile
+            if (
+                level.locks &&
+                level.locks.some(
+                    lock =>
+                        lock[0] === row &&
+                        lock[1] === col
+                )
+            ) {
+                tile.classList.add("lock");
+            }
+
+
+            board.appendChild(tile);
+        }
+    }
+    updateNavigationButtons();
 }
 
 createBoard();
@@ -148,8 +148,8 @@ createBoard();
 // ======================================
 
 function handlePointerDown(event) {
-        event.preventDefault();
-        const tile = event.target;
+    event.preventDefault();
+    const tile = event.target;
 
 
 
@@ -159,14 +159,14 @@ function handlePointerDown(event) {
 
     isDrawing = true;
 
-currentPath = [
-    {
-        row: Number(tile.dataset.row),
-        col: Number(tile.dataset.col)
-    }
-];
+    currentPath = [
+        {
+            row: Number(tile.dataset.row),
+            col: Number(tile.dataset.col)
+        }
+    ];
 
-tile.classList.add("path");
+    tile.classList.add("path");
 
 }
 
@@ -180,18 +180,18 @@ function handlePointerMove(event) {
         event.clientX,
         event.clientY
     );
-    
+
     const tile = element
         ? element.closest(".tile")
         : null;
 
-if (!tile) {
-    return;
-}
+    if (!tile) {
+        return;
+    }
 
 
-tryAddTile(tile);
-    
+    tryAddTile(tile);
+
 }
 
 function handlePointerUp() {
@@ -210,14 +210,14 @@ function handlePointerUp() {
         .forEach(tile => {
             tile.classList.remove("path");
         });
-hasKey = false;
+    hasKey = false;
 
-document
-    .querySelectorAll(".tile.lock")
-    .forEach(lockTile => {
-        lockTile.classList.remove("unlocked");
-    });
-    
+    document
+        .querySelectorAll(".tile.lock")
+        .forEach(lockTile => {
+            lockTile.classList.remove("unlocked");
+        });
+
     currentPath = [];
 }
 
@@ -239,23 +239,23 @@ function findShortestPathLength(level) {
     const start = level.start;
     const goal = level.goal;
 
-   const queue = [
-    {
-        row: start[0],
-        col: start[1],
-        moves: 0,
-        hasKey: false,
-        path: new Set([
-            `${start[0]},${start[1]}`
-        ])
-    }
-];
+    const queue = [
+        {
+            row: start[0],
+            col: start[1],
+            moves: 0,
+            hasKey: false,
+            path: new Set([
+                `${start[0]},${start[1]}`
+            ])
+        }
+    ];
 
     const visited = new Set();
 
     visited.add(
-    `${start[0]},${start[1]},false`
-);
+        `${start[0]},${start[1]},false`
+    );
 
     while (queue.length > 0) {
         const current = queue.shift();
@@ -301,60 +301,60 @@ function findShortestPathLength(level) {
             );
 
             if (isWall) {
-            continue;
+                continue;
             }
 
-        const isLocked =
-        level.locks &&
-        level.locks.some(
-        lock =>
-            lock[0] === newRow &&
-            lock[1] === newCol
-    );
+            const isLocked =
+                level.locks &&
+                level.locks.some(
+                    lock =>
+                        lock[0] === newRow &&
+                        lock[1] === newCol
+                );
 
-if (isLocked && !current.hasKey) {
-    continue;
-}
+            if (isLocked && !current.hasKey) {
+                continue;
+            }
 
-const pathKey =
-    `${newRow},${newCol}`;
+            const pathKey =
+                `${newRow},${newCol}`;
 
-if (current.path.has(pathKey)) {
-    continue;
-}
+            if (current.path.has(pathKey)) {
+                continue;
+            }
 
-const foundKey =
-    current.hasKey ||
-    (
-        level.key &&
-        newRow === level.key[0] &&
-        newCol === level.key[1]
-    );
+            const foundKey =
+                current.hasKey ||
+                (
+                    level.key &&
+                    newRow === level.key[0] &&
+                    newCol === level.key[1]
+                );
 
-const key =
-    `${newRow},${newCol},${foundKey}`;
+            const key =
+                `${newRow},${newCol},${foundKey}`;
 
-// Don't check the same tile twice
-if (visited.has(key)) {
-    continue;
-}
+            // Don't check the same tile twice
+            if (visited.has(key)) {
+                continue;
+            }
 
-visited.add(key);
+            visited.add(key);
 
-const newPath =
-    new Set(current.path);
+            const newPath =
+                new Set(current.path);
 
-newPath.add(pathKey);
+            newPath.add(pathKey);
 
-queue.push({
-    row: newRow,
-    col: newCol,
-    moves: current.moves + 1,
-    hasKey: foundKey,
-    path: newPath
-        });
-}
-}
+            queue.push({
+                row: newRow,
+                col: newCol,
+                moves: current.moves + 1,
+                hasKey: foundKey,
+                path: newPath
+            });
+        }
+    }
 
     // No possible route
     return null;
@@ -367,16 +367,16 @@ function tryAddTile(tile) {
         col: Number(tile.dataset.col)
     };
 
-if (tile.classList.contains("wall")) {
-    return;
-}
+    if (tile.classList.contains("wall")) {
+        return;
+    }
 
-if (
-    tile.classList.contains("lock") &&
-    !hasKey
-) {
-    return;
-}
+    if (
+        tile.classList.contains("lock") &&
+        !hasKey
+    ) {
+        return;
+    }
 
     // Check whether this tile is already in the path
     const existingIndex = currentPath.findIndex(pathTile =>
@@ -400,7 +400,21 @@ if (
 
             removedTileElement.classList.remove("path");
 
+            if (
+                level.key &&
+                removedTile.row === level.key[0] &&
+                removedTile.col === level.key[1]
+            ) {
+                hasKey = false;
+
+                document
+                    .querySelectorAll(".tile.lock")
+                    .forEach(lockTile => {
+                        lockTile.classList.remove("unlocked");
+                    });
             }
+
+        }
 
         return;
     }
@@ -416,81 +430,81 @@ if (
     tile.classList.add("path");
     currentPath.push(newTile);
 
-if (tile.classList.contains("key")) {
-    hasKey = true;
+    if (tile.classList.contains("key")) {
+        hasKey = true;
 
-    document
-        .querySelectorAll(".tile.lock")
-        .forEach(lockTile => {
-            lockTile.classList.add("unlocked");
-        });
-}
-
- if (tile.classList.contains("goal")) {
-    levelComplete = true;
-    isDrawing = false;
-
-    const playerMoves =
-        currentPath.length - 1;
-
-    const optimalMoves =
-        findShortestPathLength(level);
-
-    const levelId =
-        level.id;
-
-if (
-    currentLevelIndex === highestUnlockedLevel &&
-    highestUnlockedLevel < levels.length - 1
-) {
-    highestUnlockedLevel++;
-
-    localStorage.setItem(
-        "traceHighestUnlockedLevel",
-        highestUnlockedLevel
-    );
-}
-
-updateNavigationButtons();
-
-    const previousBest =
-        bestMovesByLevel[levelId];
-
-const isNewBest =
-    previousBest === undefined ||
-    playerMoves < previousBest;
-
-    if (
-        previousBest === undefined ||
-        playerMoves < previousBest
-    ) 
-  if (isNewBest) {
-    bestMovesByLevel[levelId] =
-        playerMoves;
-
-    localStorage.setItem(
-    "traceBestMoves",
-    JSON.stringify(bestMovesByLevel)
-    );
+        document
+            .querySelectorAll(".tile.lock")
+            .forEach(lockTile => {
+                lockTile.classList.add("unlocked");
+            });
     }
 
-    const bestMoves =
-        bestMovesByLevel[levelId];
+    if (tile.classList.contains("goal")) {
+        levelComplete = true;
+        isDrawing = false;
 
-if (currentLevelIndex === levels.length - 1) {
-    levelMessage.textContent =
-        `All Levels Complete! Moves: ${playerMoves} | Best: ${bestMoves} | Optimal: ${optimalMoves}`;
-} else if (playerMoves === optimalMoves) {
-    levelMessage.textContent =
-        `Perfect! Moves: ${playerMoves} | Best: ${bestMoves} | Optimal: ${optimalMoves}`;
-} else if (isNewBest) {
-    levelMessage.textContent =
-        `New Best! Moves: ${playerMoves} | Best: ${bestMoves} | Optimal: ${optimalMoves}`;
-} else {
-    levelMessage.textContent =
-        `Level Complete! Moves: ${playerMoves} | Best: ${bestMoves} | Optimal: ${optimalMoves}`;
-}
-}
+        const playerMoves =
+            currentPath.length - 1;
+
+        const optimalMoves =
+            findShortestPathLength(level);
+
+        const levelId =
+            level.id;
+
+        if (
+            currentLevelIndex === highestUnlockedLevel &&
+            highestUnlockedLevel < levels.length - 1
+        ) {
+            highestUnlockedLevel++;
+
+            localStorage.setItem(
+                "traceHighestUnlockedLevel",
+                highestUnlockedLevel
+            );
+        }
+
+        updateNavigationButtons();
+
+        const previousBest =
+            bestMovesByLevel[levelId];
+
+        const isNewBest =
+            previousBest === undefined ||
+            playerMoves < previousBest;
+
+        if (
+            previousBest === undefined ||
+            playerMoves < previousBest
+        )
+            if (isNewBest) {
+                bestMovesByLevel[levelId] =
+                    playerMoves;
+
+                localStorage.setItem(
+                    "traceBestMoves",
+                    JSON.stringify(bestMovesByLevel)
+                );
+            }
+
+        const bestMoves =
+            bestMovesByLevel[levelId];
+
+        if (currentLevelIndex === levels.length - 1) {
+            levelMessage.textContent =
+                `All Levels Complete! Moves: ${playerMoves} | Best: ${bestMoves} | Optimal: ${optimalMoves}`;
+        } else if (playerMoves === optimalMoves) {
+            levelMessage.textContent =
+                `Perfect! Moves: ${playerMoves} | Best: ${bestMoves} | Optimal: ${optimalMoves}`;
+        } else if (isNewBest) {
+            levelMessage.textContent =
+                `New Best! Moves: ${playerMoves} | Best: ${bestMoves} | Optimal: ${optimalMoves}`;
+        } else {
+            levelMessage.textContent =
+                `Level Complete! Moves: ${playerMoves} | Best: ${bestMoves} | Optimal: ${optimalMoves}`;
+        }
+    }
 }
 
 // ======================================
@@ -504,10 +518,10 @@ function restartLevel() {
     hasKey = false;
 
     document
-    .querySelectorAll(".tile.lock")
-    .forEach(lockTile => {
-        lockTile.classList.remove("unlocked");
-    });
+        .querySelectorAll(".tile.lock")
+        .forEach(lockTile => {
+            lockTile.classList.remove("unlocked");
+        });
 
     document
         .querySelectorAll(".tile.path")
@@ -549,8 +563,8 @@ function updateNavigationButtons() {
         currentLevelIndex === 0;
 
     nextButton.disabled =
-    currentLevelIndex >= highestUnlockedLevel ||
-    currentLevelIndex >= levels.length - 1;
+        currentLevelIndex >= highestUnlockedLevel ||
+        currentLevelIndex >= levels.length - 1;
 }
 
 
