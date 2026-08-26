@@ -210,7 +210,14 @@ function handlePointerUp() {
         .forEach(tile => {
             tile.classList.remove("path");
         });
+hasKey = false;
 
+document
+    .querySelectorAll(".tile.lock")
+    .forEach(lockTile => {
+        lockTile.classList.remove("unlocked");
+    });
+    
     currentPath = [];
 }
 
