@@ -96,6 +96,7 @@ body {
 /* ---------- Header ---------- */
 
 .game-header {
+  position: relative;
   text-align: center;
   margin-bottom: 16px;
 }
@@ -114,30 +115,42 @@ body {
 /* ---------- Settings ---------- */
 
 .settings {
-  margin-bottom: 14px;
+  position: absolute;
+  left: 0;
+  top: 10px;
+  margin-bottom: 0;
 }
 
 .settings summary {
   width: max-content;
-  min-height: 44px;
-  margin-left: auto;
-  padding: 11px 14px;
+  min-height: 36px;
+  margin-left: 0;
+  padding: 6px 8px;
   border-radius: 10px;
   background: var(--control-background);
   color: var(--page-text);
   cursor: pointer;
+
+  list-style: none;
 }
 
-.settings summary:hover {
-  background: var(--control-hover);
+.settings summary::-webkit-details-marker {
+  display: none;
 }
 
 .settings-panel {
+
+  position: absolute;
+  width: 320px;
+  top: 42px;
+  left: 0;
+  z-index: 20;
+
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
   gap: 10px 12px;
   align-items: center;
-  margin-top: 10px;
+  margin-top: 0px;
   padding: 14px;
   border: 2px solid var(--tile-background);
   border-radius: 12px;
