@@ -4,6 +4,12 @@
 
 const LEGACY_KEY_ID = "legacy-key";
 const DIRECTIONS = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+const ONE_WAY_DIRECTIONS = {
+    up: [-1, 0],
+    down: [1, 0],
+    left: [0, -1],
+    right: [0, 1]
+};
 const HANDEDNESS_STORAGE_KEY = "traceHandedness";
 const THEME_STORAGE_KEY = "traceColorTheme";
 const VALID_HANDEDNESS = ["right", "left"];
@@ -22,6 +28,7 @@ const VALID_THEMES = [
 function normalizeLevel(authoredLevel) {
     const keys = [];
     const gates = [];
+    const oneWays = validateAndCopyOneWays(authoredLevel);
 
     if (authoredLevel.key) {
         keys.push({
@@ -59,7 +66,8 @@ function normalizeLevel(authoredLevel) {
         goal: [...authoredLevel.goal],
         walls: authoredLevel.walls.map(wall => [...wall]),
         keys,
-        gates
+        gates,
+        oneWays
     };
 
     // Lookup maps avoid repeatedly scanning coordinate arrays during play.
@@ -73,6 +81,12 @@ function normalizeLevel(authoredLevel) {
         ])
     );
     normalizedLevel.gateByPosition = new Map();
+    normalizedLevel.oneWayByPosition = new Map(
+        normalizedLevel.oneWays.map(oneWay => [
+            positionKey(oneWay.position),
+            oneWay
+        ])
+    );
 
     normalizedLevel.gates.forEach(group => {
         group.tiles.forEach(tile => {
@@ -84,6 +98,77 @@ function normalizeLevel(authoredLevel) {
     });
 
     return normalizedLevel;
+}
+
+// Invalid mechanic data is rejected before a level can be played or solved.
+// This same validation can later be reused by an automatic level generator.
+function validateAndCopyOneWays(authoredLevel) {
+    const oneWays = authoredLevel.oneWays || [];
+    const wallPositions = new Set(
+        authoredLevel.walls.map(positionKey)
+    );
+    const usedPositions = new Set();
+
+    if (!Array.isArray(oneWays)) {
+        throw new Error(
+            `Level ${authoredLevel.id}: oneWays must be an array.`
+        );
+    }
+
+    return oneWays.map((oneWay, index) => {
+        const position = oneWay && oneWay.position;
+        const direction = oneWay && oneWay.direction;
+        const hasValidPosition =
+            Array.isArray(position) &&
+            position.length === 2 &&
+            position.every(Number.isInteger);
+
+        if (!hasValidPosition) {
+            throw new Error(
+                `Level ${authoredLevel.id}: one-way ${index + 1} has an invalid position.`
+            );
+        }
+
+        const [row, col] = position;
+
+        if (
+            row < 0 ||
+            row >= authoredLevel.size ||
+            col < 0 ||
+            col >= authoredLevel.size
+        ) {
+            throw new Error(
+                `Level ${authoredLevel.id}: one-way ${index + 1} is out of bounds.`
+            );
+        }
+
+        if (ONE_WAY_DIRECTIONS[direction] === undefined) {
+            throw new Error(
+                `Level ${authoredLevel.id}: one-way ${index + 1} has an unsupported direction.`
+            );
+        }
+
+        const coordinate = positionKey(position);
+
+        if (wallPositions.has(coordinate)) {
+            throw new Error(
+                `Level ${authoredLevel.id}: a one-way tile cannot be placed on a wall.`
+            );
+        }
+
+        if (usedPositions.has(coordinate)) {
+            throw new Error(
+                `Level ${authoredLevel.id}: duplicate one-way tile at ${coordinate}.`
+            );
+        }
+
+        usedPositions.add(coordinate);
+
+        return {
+            position: [...position],
+            direction
+        };
+    });
 }
 
 const normalizedLevels = levels.map(normalizeLevel);
@@ -153,6 +238,14 @@ function isAdjacent(first, second) {
     return rowDifference + colDifference === 1;
 }
 
+function followsOneWayDirection(oneWay, from, destination) {
+    const [requiredRowChange, requiredColChange] =
+        ONE_WAY_DIRECTIONS[oneWay.direction];
+
+    return destination.row - from.row === requiredRowChange &&
+        destination.col - from.col === requiredColChange;
+}
+
 // This is the single source of truth for movement. It never reads or changes
 // the DOM, so live play and the shortest-path solver can both call it.
 function applyMove(levelToPlay, state, destination, options = {}) {
@@ -205,6 +298,23 @@ function applyMove(levelToPlay, state, destination, options = {}) {
                 complete: false
             }
         };
+    }
+
+    // Entering is unrestricted. Once standing on a one-way tile, only a new
+    // forward step must follow its arrow. Legal backtracking returned above.
+    const currentOneWay = levelToPlay.oneWayByPosition.get(
+        positionKey(lastPosition)
+    );
+
+    if (
+        currentOneWay &&
+        !followsOneWayDirection(
+            currentOneWay,
+            lastPosition,
+            destination
+        )
+    ) {
+        return { accepted: false, state };
     }
 
     const newPath = [
@@ -300,6 +410,62 @@ function displayColumnToCanonical(displayColumn) {
     return displayColumn;
 }
 
+function canonicalDirectionToDisplay(direction) {
+    if (handedness !== "left") {
+        return direction;
+    }
+
+    if (direction === "left") {
+        return "right";
+    }
+
+    if (direction === "right") {
+        return "left";
+    }
+
+    return direction;
+}
+
+function directionArrow(direction) {
+    return {
+        up: "↑",
+        down: "↓",
+        left: "←",
+        right: "→"
+    }[direction];
+}
+
+function updateTileAccessibleLabel(tile, isUnlocked = false) {
+    const labels = [];
+
+    if (tile.classList.contains("start")) {
+        labels.push("Start");
+    }
+
+    if (tile.classList.contains("goal")) {
+        labels.push("Goal");
+    }
+
+    if (tile.classList.contains("key")) {
+        labels.push("Key");
+    }
+
+    if (tile.classList.contains("lock")) {
+        labels.push(isUnlocked ? "Unlocked gate" : "Locked gate");
+    }
+
+    if (tile.classList.contains("one-way")) {
+        labels.push(
+            `One-way tile, move ${tile.dataset.direction}`
+        );
+    }
+
+    if (labels.length > 0) {
+        tile.setAttribute("role", "img");
+        tile.setAttribute("aria-label", labels.join(", "));
+    }
+}
+
 function handleHandednessChange(event) {
     handedness = event.target.value;
     localStorage.setItem(HANDEDNESS_STORAGE_KEY, handedness);
@@ -352,7 +518,6 @@ function createBoard() {
             const tile = document.createElement("div");
             const col = displayColumnToCanonical(displayCol);
             const coordinate = `${row},${col}`;
-            const accessibleLabels = [];
 
             tile.classList.add("tile");
             // Input and path rendering always use canonical model coordinates.
@@ -369,7 +534,6 @@ function createBoard() {
                 col === level.start[1]
             ) {
                 tile.classList.add("start");
-                accessibleLabels.push("Start");
             }
 
             if (
@@ -377,7 +541,6 @@ function createBoard() {
                 col === level.goal[1]
             ) {
                 tile.classList.add("goal");
-                accessibleLabels.push("Goal");
             }
 
             const keyAtPosition =
@@ -386,7 +549,6 @@ function createBoard() {
             if (keyAtPosition) {
                 tile.classList.add("key");
                 tile.dataset.keyId = keyAtPosition.id;
-                accessibleLabels.push("Key");
             }
 
             const gateAtPosition =
@@ -395,16 +557,23 @@ function createBoard() {
             if (gateAtPosition) {
                 tile.classList.add("lock");
                 tile.dataset.keyId = gateAtPosition.keyId;
-                accessibleLabels.push("Locked gate");
             }
 
-            if (accessibleLabels.length > 0) {
-                tile.setAttribute("role", "img");
-                tile.setAttribute(
-                    "aria-label",
-                    accessibleLabels.join(", ")
-                );
+            const oneWayAtPosition =
+                level.oneWayByPosition.get(coordinate);
+
+            if (oneWayAtPosition) {
+                const displayDirection =
+                    canonicalDirectionToDisplay(
+                        oneWayAtPosition.direction
+                    );
+
+                tile.classList.add("one-way");
+                tile.dataset.direction = displayDirection;
+                tile.dataset.arrow = directionArrow(displayDirection);
             }
+
+            updateTileAccessibleLabel(tile);
 
             tile.addEventListener(
                 "pointerdown",
@@ -440,10 +609,7 @@ function renderAttemptState() {
                 collectedKeys.has(tile.dataset.keyId);
 
             tile.classList.toggle("unlocked", isUnlocked);
-            tile.setAttribute(
-                "aria-label",
-                isUnlocked ? "Unlocked gate" : "Locked gate"
-            );
+            updateTileAccessibleLabel(tile, isUnlocked);
         }
     });
 }
