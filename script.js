@@ -209,6 +209,20 @@ function collectKeysOnPath(levelToCheck, path) {
     return foundKeys;
 }
 
+function collectOneWaysOnPath(levelToCheck, path) {
+    const visitedOneWays = new Set();
+
+    path.forEach(position => {
+        const coordinate = positionKey(position);
+
+        if (levelToCheck.oneWayByPosition.has(coordinate)) {
+            visitedOneWays.add(coordinate);
+        }
+    });
+
+    return visitedOneWays;
+}
+
 function createAttemptState(levelToStart) {
     const start = {
         row: levelToStart.start[0],
@@ -218,6 +232,10 @@ function createAttemptState(levelToStart) {
     return {
         path: [start],
         collectedKeys: collectKeysOnPath(levelToStart, [start]),
+        visitedOneWays: collectOneWaysOnPath(
+            levelToStart,
+            [start]
+        ),
         complete: false
     };
 }
@@ -295,6 +313,10 @@ function applyMove(levelToPlay, state, destination, options = {}) {
                     levelToPlay,
                     newPath
                 ),
+                visitedOneWays: collectOneWaysOnPath(
+                    levelToPlay,
+                    newPath
+                ),
                 complete: false
             }
         };
@@ -329,9 +351,26 @@ function applyMove(levelToPlay, state, destination, options = {}) {
         collectedKeys.add(foundKey.id);
     }
 
-    const complete =
+    const visitedOneWays = new Set(state.visitedOneWays);
+
+    if (levelToPlay.oneWayByPosition.has(destinationKey)) {
+        visitedOneWays.add(destinationKey);
+    }
+
+    const isGoal =
         destination.row === levelToPlay.goal[0] &&
         destination.col === levelToPlay.goal[1];
+
+    // The goal is blocked until every required arrow is in the active path.
+    // Return the original state so the player can keep tracing elsewhere.
+    if (
+        isGoal &&
+        visitedOneWays.size < levelToPlay.oneWays.length
+    ) {
+        return { accepted: false, state };
+    }
+
+    const complete = isGoal;
 
     return {
         accepted: true,
@@ -339,6 +378,7 @@ function applyMove(levelToPlay, state, destination, options = {}) {
         state: {
             path: newPath,
             collectedKeys,
+            visitedOneWays,
             complete
         }
     };
@@ -388,6 +428,8 @@ const levelNumber =
     document.querySelector(".level-number");
 const levelTitle =
     document.querySelector(".level-title");
+const gameMessage =
+    document.querySelector(".game-message");
 const handednessSelect =
     document.querySelector("#handedness-select");
 const themeSelect =
@@ -456,7 +498,7 @@ function updateTileAccessibleLabel(tile, isUnlocked = false) {
 
     if (tile.classList.contains("one-way")) {
         labels.push(
-            `One-way tile, move ${tile.dataset.direction}`
+            `Required one-way tile, move ${tile.dataset.direction}`
         );
     }
 
@@ -492,6 +534,9 @@ function createBoard() {
     levelNumber.textContent =
         `Level ${currentLevelIndex + 1}`;
     levelTitle.textContent = level.title;
+    gameMessage.textContent = level.oneWays.length > 0
+        ? "Start at the circle. Visit every arrow, then reach the star."
+        : "Start at the circle and reach the star.";
 
     const savedBest = bestMovesByLevel[level.id];
     const optimalMoves = findShortestPathLength(level);
@@ -690,10 +735,13 @@ function solverStateKey(levelToSolve, state) {
     const inventory = [...state.collectedKeys]
         .sort()
         .join("-");
+    const visitedOneWays = [...state.visitedOneWays]
+        .sort()
+        .join("|");
 
     // Keep the original BFS visitation behavior: position plus collected keys.
     // applyMove still checks each candidate path's no-revisit rule.
-    return `${positionKey(position)};${inventory}`;
+    return `${positionKey(position)};${inventory};${visitedOneWays}`;
 }
 
 function findShortestPathLength(levelToSolve) {
