@@ -1,5 +1,71 @@
 /* ---------- General ---------- */
 
+:root {
+  --page-background: #111827;
+  --page-text: #f8fafc;
+  --muted-text: #cbd5e1;
+  --board-background: #273449;
+  --tile-background: #475569;
+  --wall-background: #312e81;
+  --wall-border: #6366f1;
+  --start-background: #22c55e;
+  --goal-background: #3b82f6;
+  --key-background: #f59e0b;
+  --gate-locked-background: #dc2626;
+  --gate-unlocked-background: #0891b2;
+  --gate-unlocked-border: #22d3ee;
+  --symbol-color: #ffffff;
+  --path-color: #ffffff;
+  --control-background: #334155;
+  --control-hover: #475569;
+  --control-disabled: #1e293b;
+  --control-disabled-text: #64748b;
+}
+
+:root[data-theme="high-contrast"] {
+  --page-background: #000000;
+  --page-text: #ffffff;
+  --muted-text: #ffffff;
+  --board-background: #000000;
+  --tile-background: #333333;
+  --wall-background: #000000;
+  --wall-border: #ffffff;
+  --start-background: #008000;
+  --goal-background: #005fcc;
+  --key-background: #8a5700;
+  --gate-locked-background: #9f0000;
+  --gate-unlocked-background: #006b73;
+  --gate-unlocked-border: #ffffff;
+  --symbol-color: #ffffff;
+  --path-color: #ffff00;
+  --control-background: #222222;
+  --control-hover: #444444;
+  --control-disabled: #111111;
+  --control-disabled-text: #aaaaaa;
+}
+
+:root[data-theme="color-vision-friendly"] {
+  --page-background: #172033;
+  --page-text: #ffffff;
+  --muted-text: #e2e8f0;
+  --board-background: #26344d;
+  --tile-background: #52637a;
+  --wall-background: #332c4f;
+  --wall-border: #a99be8;
+  --start-background: #007f7b;
+  --goal-background: #b54e00;
+  --key-background: #7552a3;
+  --gate-locked-background: #9c245f;
+  --gate-unlocked-background: #176b87;
+  --gate-unlocked-border: #8bdcf1;
+  --symbol-color: #ffffff;
+  --path-color: #ffffff;
+  --control-background: #354761;
+  --control-hover: #4a607d;
+  --control-disabled: #202b3c;
+  --control-disabled-text: #9aa8ba;
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -7,8 +73,8 @@
 }
 
 body {
-  background: #111827;
-  color: #f8fafc;
+  background: var(--page-background);
+  color: var(--page-text);
   font-family: Arial, Helvetica, sans-serif;
 
   display: flex;
@@ -31,7 +97,7 @@ body {
 
 .game-header {
   text-align: center;
-  margin-bottom: 28px;
+  margin-bottom: 16px;
 }
 
 .logo {
@@ -42,7 +108,62 @@ body {
 
 .level-label {
   margin-top: 8px;
-  color: #94a3b8;
+  color: var(--muted-text);
+}
+
+/* ---------- Settings ---------- */
+
+.settings {
+  margin-bottom: 14px;
+}
+
+.settings summary {
+  width: max-content;
+  min-height: 44px;
+  margin-left: auto;
+  padding: 11px 14px;
+  border-radius: 10px;
+  background: var(--control-background);
+  color: var(--page-text);
+  cursor: pointer;
+}
+
+.settings summary:hover {
+  background: var(--control-hover);
+}
+
+.settings-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+  gap: 10px 12px;
+  align-items: center;
+  margin-top: 10px;
+  padding: 14px;
+  border: 2px solid var(--tile-background);
+  border-radius: 12px;
+  background: var(--board-background);
+}
+
+.settings-panel label {
+  font-weight: 600;
+}
+
+.settings-panel select {
+  width: 100%;
+  min-height: 44px;
+  padding: 8px;
+  border: 2px solid var(--muted-text);
+  border-radius: 8px;
+  background: var(--page-background);
+  color: var(--page-text);
+  font: inherit;
+}
+
+.settings summary:focus-visible,
+.settings-panel select:focus-visible,
+.game-controls button:focus-visible {
+  outline: 3px solid var(--path-color);
+  outline-offset: 3px;
 }
 
 /* ---------- Game Board ---------- */
@@ -54,7 +175,7 @@ body {
     width: 100%;
     aspect-ratio: 1;
 
-    background: #273449;
+    background: var(--board-background);
 
     border-radius: 18px;
     padding: 10px;
@@ -63,14 +184,18 @@ body {
     grid-template-columns: repeat(5, 1fr);
     grid-template-rows: repeat(5, 1fr);
 
-    touch-action: none;
     gap: 8px;
 
     margin-bottom: 20px;
 }
 
 .tile {
-    background: #475569;
+    position: relative;
+    display: grid;
+    place-items: center;
+    min-width: 0;
+    min-height: 0;
+    background: var(--tile-background);
     border-radius: 8px;
 
     transition: background-color 0.1s ease;
@@ -78,9 +203,52 @@ body {
     -webkit-user-drag: none;
 }
 
+/* Symbols are decorative because the board supplies concise tile labels. */
+.tile::after {
+    color: var(--symbol-color);
+    font-size: clamp(0.55rem, 3.8vw, 1.25rem);
+    font-weight: 900;
+    line-height: 1;
+    text-shadow: 0 1px 2px #000000;
+    pointer-events: none;
+}
+
+.tile.start::after {
+    content: "●";
+}
+
+.tile.goal::after {
+    content: "★";
+}
+
+.tile.key::after {
+    content: "◆";
+}
+
+.tile.lock::after {
+    content: "▦";
+}
+
+.tile.lock.unlocked::after {
+    content: "□";
+}
+
+.game-board[data-size="15"] {
+    gap: 3px;
+    padding: 7px;
+}
+
+.game-board[data-size="15"] .tile {
+    border-radius: 4px;
+}
+
+.game-board[data-size="15"] .tile::after {
+    font-size: clamp(0.45rem, 2.6vw, 0.72rem);
+}
+
 .tile.wall {
-    background: #312e81;
-    border: 2px solid #6366f1;
+    background: var(--wall-background);
+    border: 2px solid var(--wall-border);
 }
 
 /* ---------- Message ---------- */
@@ -88,7 +256,7 @@ body {
 .game-message {
   text-align: center;
   margin-bottom: 24px;
-  color: #cbd5e1;
+  color: var(--muted-text);
 }
 
 /* ---------- Buttons ---------- */
@@ -106,8 +274,8 @@ body {
   border: none;
   border-radius: 10px;
 
-  background: #334155;
-  color: white;
+  background: var(--control-background);
+  color: var(--page-text);
 
   font-size: 1rem;
   cursor: pointer;
@@ -116,19 +284,19 @@ body {
 }
 
 .game-controls button:hover {
-  background: #475569;
+  background: var(--control-hover);
 }
 
 .tile.start {
-  background: #22c55e;
+  background: var(--start-background);
 }
 
 .tile.goal {
-  background: #3b82f6;
+  background: var(--goal-background);
 }
 
 .tile.path {
-    outline: 3px solid white;
+    outline: 3px solid var(--path-color);
     outline-offset: -3px;
 }
 
@@ -142,21 +310,42 @@ body {
 
 .game-controls button:disabled,
 .game-controls button:disabled:hover {
-    background: #1e293b;
-    color: #64748b;
+    background: var(--control-disabled);
+    color: var(--control-disabled-text);
     opacity: 0.5;
     cursor: not-allowed;
 }
 
 .tile.key {
-    background: #f59e0b;
+    background: var(--key-background);
 }
 
 .tile.lock {
-    background: #dc2626;
+    background: var(--gate-locked-background);
 }
 
 .tile.unlocked {
-    background: #0891b2;
-    border: 2px solid #22d3ee;
+    background: var(--gate-unlocked-background);
+    border: 2px solid var(--gate-unlocked-border);
+}
+
+@media (max-width: 380px) {
+  .game-shell {
+    padding: 16px;
+  }
+
+  .game-controls {
+    gap: 6px;
+  }
+
+  .game-controls button {
+    padding: 12px 6px;
+    font-size: 0.85rem;
+  }
+}
+
+@media (max-height: 800px) {
+  body {
+    align-items: flex-start;
+  }
 }

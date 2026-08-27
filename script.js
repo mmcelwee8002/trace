@@ -4,6 +4,14 @@
 
 const LEGACY_KEY_ID = "legacy-key";
 const DIRECTIONS = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+const HANDEDNESS_STORAGE_KEY = "traceHandedness";
+const THEME_STORAGE_KEY = "traceColorTheme";
+const VALID_HANDEDNESS = ["right", "left"];
+const VALID_THEMES = [
+    "default",
+    "high-contrast",
+    "color-vision-friendly"
+];
 
 // ======================================
 // Level normalization
@@ -246,6 +254,16 @@ let bestMovesByLevel =
     JSON.parse(
         localStorage.getItem("traceBestMoves")
     ) || {};
+let handedness = localStorage.getItem(HANDEDNESS_STORAGE_KEY);
+let colorTheme = localStorage.getItem(THEME_STORAGE_KEY);
+
+if (!VALID_HANDEDNESS.includes(handedness)) {
+    handedness = "right";
+}
+
+if (!VALID_THEMES.includes(colorTheme)) {
+    colorTheme = "default";
+}
 
 const board = document.querySelector(".game-board");
 const levelMessage =
@@ -260,6 +278,42 @@ const levelNumber =
     document.querySelector(".level-number");
 const levelTitle =
     document.querySelector(".level-title");
+const handednessSelect =
+    document.querySelector("#handedness-select");
+const themeSelect =
+    document.querySelector("#theme-select");
+
+// ======================================
+// Accessibility and presentation settings
+// ======================================
+
+function applyTheme() {
+    document.documentElement.dataset.theme = colorTheme;
+    themeSelect.value = colorTheme;
+}
+
+function displayColumnToCanonical(displayColumn) {
+    if (handedness === "left") {
+        return level.size - 1 - displayColumn;
+    }
+
+    return displayColumn;
+}
+
+function handleHandednessChange(event) {
+    handedness = event.target.value;
+    localStorage.setItem(HANDEDNESS_STORAGE_KEY, handedness);
+
+    // Rebuild only the presentation. The level model and active path retain
+    // their original canonical coordinates.
+    createBoard();
+}
+
+function handleThemeChange(event) {
+    colorTheme = event.target.value;
+    localStorage.setItem(THEME_STORAGE_KEY, colorTheme);
+    applyTheme();
+}
 
 // ======================================
 // Board rendering
@@ -267,6 +321,8 @@ const levelTitle =
 
 function createBoard() {
     board.innerHTML = "";
+    board.dataset.size = level.size;
+    board.dataset.handedness = handedness;
     levelNumber.textContent =
         `Level ${currentLevelIndex + 1}`;
     levelTitle.textContent = level.title;
@@ -288,13 +344,21 @@ function createBoard() {
         `repeat(${level.size}, 1fr)`;
 
     for (let row = 0; row < level.size; row++) {
-        for (let col = 0; col < level.size; col++) {
+        for (
+            let displayCol = 0;
+            displayCol < level.size;
+            displayCol++
+        ) {
             const tile = document.createElement("div");
+            const col = displayColumnToCanonical(displayCol);
             const coordinate = `${row},${col}`;
+            const accessibleLabels = [];
 
             tile.classList.add("tile");
+            // Input and path rendering always use canonical model coordinates.
             tile.dataset.row = row;
             tile.dataset.col = col;
+            tile.dataset.displayCol = displayCol;
 
             if (level.wallPositions.has(coordinate)) {
                 tile.classList.add("wall");
@@ -305,6 +369,7 @@ function createBoard() {
                 col === level.start[1]
             ) {
                 tile.classList.add("start");
+                accessibleLabels.push("Start");
             }
 
             if (
@@ -312,6 +377,7 @@ function createBoard() {
                 col === level.goal[1]
             ) {
                 tile.classList.add("goal");
+                accessibleLabels.push("Goal");
             }
 
             const keyAtPosition =
@@ -320,6 +386,7 @@ function createBoard() {
             if (keyAtPosition) {
                 tile.classList.add("key");
                 tile.dataset.keyId = keyAtPosition.id;
+                accessibleLabels.push("Key");
             }
 
             const gateAtPosition =
@@ -328,6 +395,15 @@ function createBoard() {
             if (gateAtPosition) {
                 tile.classList.add("lock");
                 tile.dataset.keyId = gateAtPosition.keyId;
+                accessibleLabels.push("Locked gate");
+            }
+
+            if (accessibleLabels.length > 0) {
+                tile.setAttribute("role", "img");
+                tile.setAttribute(
+                    "aria-label",
+                    accessibleLabels.join(", ")
+                );
             }
 
             tile.addEventListener(
@@ -339,6 +415,7 @@ function createBoard() {
     }
 
     updateNavigationButtons();
+    renderAttemptState();
 }
 
 function renderAttemptState() {
@@ -359,9 +436,13 @@ function renderAttemptState() {
         );
 
         if (tile.classList.contains("lock")) {
-            tile.classList.toggle(
-                "unlocked",
-                collectedKeys.has(tile.dataset.keyId)
+            const isUnlocked =
+                collectedKeys.has(tile.dataset.keyId);
+
+            tile.classList.toggle("unlocked", isUnlocked);
+            tile.setAttribute(
+                "aria-label",
+                isUnlocked ? "Unlocked gate" : "Locked gate"
             );
         }
     });
@@ -611,5 +692,12 @@ document.addEventListener("pointercancel", handlePointerEnd);
 restartButton.addEventListener("click", restartLevel);
 nextButton.addEventListener("click", loadNextLevel);
 previousButton.addEventListener("click", loadPreviousLevel);
+handednessSelect.addEventListener(
+    "change",
+    handleHandednessChange
+);
+themeSelect.addEventListener("change", handleThemeChange);
 
+handednessSelect.value = handedness;
+applyTheme();
 createBoard();

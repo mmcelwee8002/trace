@@ -21,12 +21,31 @@
       <p class="level-title"></p>
     </header>
 
+    <details class="settings">
+      <summary>Settings</summary>
+
+      <div class="settings-panel">
+        <label for="handedness-select">Handedness</label>
+        <select id="handedness-select">
+          <option value="right">Right-handed</option>
+          <option value="left">Left-handed</option>
+        </select>
+
+        <label for="theme-select">Color theme</label>
+        <select id="theme-select">
+          <option value="default">Default</option>
+          <option value="high-contrast">High Contrast</option>
+          <option value="color-vision-friendly">Color-Vision-Friendly</option>
+        </select>
+      </div>
+    </details>
+
     <section class="game-board" aria-label="Trace puzzle board">
       <!-- The puzzle grid will be generated here with JavaScript. -->
     </section>
 
     <p class="game-message">
-      Start at the green tile and reach the goal.
+      Start at the circle and reach the star.
     </p>
 
 <p class="level-message" aria-live="polite"></p>
