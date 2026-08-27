@@ -1,4 +1,5 @@
 
+//checkpoint added.  clean code before codex
 //Start the game
 
 // ------------------------------------
