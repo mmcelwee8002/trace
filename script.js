@@ -29,6 +29,8 @@ function normalizeLevel(authoredLevel) {
     const keys = [];
     const gates = [];
     const oneWays = validateAndCopyOneWays(authoredLevel);
+    const switchMechanics =
+        validateAndCopySwitchMechanics(authoredLevel);
 
     if (authoredLevel.key) {
         keys.push({
@@ -67,7 +69,9 @@ function normalizeLevel(authoredLevel) {
         walls: authoredLevel.walls.map(wall => [...wall]),
         keys,
         gates,
-        oneWays
+        oneWays,
+        switches: switchMechanics.switches,
+        switchGates: switchMechanics.switchGates
     };
 
     // Lookup maps avoid repeatedly scanning coordinate arrays during play.
@@ -87,6 +91,13 @@ function normalizeLevel(authoredLevel) {
             oneWay
         ])
     );
+    normalizedLevel.switchByPosition = new Map(
+        normalizedLevel.switches.map(gameSwitch => [
+            positionKey(gameSwitch.position),
+            gameSwitch
+        ])
+    );
+    normalizedLevel.switchGateByPosition = new Map();
 
     normalizedLevel.gates.forEach(group => {
         group.tiles.forEach(tile => {
@@ -97,7 +108,162 @@ function normalizeLevel(authoredLevel) {
         });
     });
 
+    normalizedLevel.switchGates.forEach(group => {
+        group.tiles.forEach(tile => {
+            normalizedLevel.switchGateByPosition.set(
+                positionKey(tile),
+                group
+            );
+        });
+    });
+
     return normalizedLevel;
+}
+
+// Switch validation rejects broken references before gameplay or generation.
+function validateAndCopySwitchMechanics(authoredLevel) {
+    const authoredSwitches = authoredLevel.switches || [];
+    const authoredSwitchGates = authoredLevel.switchGates || [];
+    const wallPositions = new Set(
+        authoredLevel.walls.map(positionKey)
+    );
+    const switchIds = new Set();
+    const switchPositions = new Set();
+    const gateSwitchIds = new Set();
+    const gatePositions = new Set();
+
+    if (!Array.isArray(authoredSwitches)) {
+        throw new Error(
+            `Level ${authoredLevel.id}: switches must be an array.`
+        );
+    }
+
+    if (!Array.isArray(authoredSwitchGates)) {
+        throw new Error(
+            `Level ${authoredLevel.id}: switchGates must be an array.`
+        );
+    }
+
+    const switches = authoredSwitches.map((gameSwitch, index) => {
+        const id = gameSwitch && gameSwitch.id;
+        const position = gameSwitch && gameSwitch.position;
+
+        if (typeof id !== "string" || id.trim() === "") {
+            throw new Error(
+                `Level ${authoredLevel.id}: switch ${index + 1} needs a valid ID.`
+            );
+        }
+
+        if (switchIds.has(id)) {
+            throw new Error(
+                `Level ${authoredLevel.id}: duplicate switch ID ${id}.`
+            );
+        }
+
+        validateSwitchCoordinate(
+            authoredLevel,
+            position,
+            `switch ${id}`
+        );
+
+        const coordinate = positionKey(position);
+
+        if (wallPositions.has(coordinate)) {
+            throw new Error(
+                `Level ${authoredLevel.id}: switch ${id} cannot be placed on a wall.`
+            );
+        }
+
+        if (switchPositions.has(coordinate)) {
+            throw new Error(
+                `Level ${authoredLevel.id}: duplicate switch position ${coordinate}.`
+            );
+        }
+
+        switchIds.add(id);
+        switchPositions.add(coordinate);
+
+        return { id, position: [...position] };
+    });
+
+    const switchGates = authoredSwitchGates.map((group, index) => {
+        const switchId = group && group.switchId;
+        const tiles = group && group.tiles;
+
+        if (!switchIds.has(switchId)) {
+            throw new Error(
+                `Level ${authoredLevel.id}: switch gate ${index + 1} references an unknown switch.`
+            );
+        }
+
+        if (gateSwitchIds.has(switchId)) {
+            throw new Error(
+                `Level ${authoredLevel.id}: duplicate gate group for switch ${switchId}.`
+            );
+        }
+
+        if (!Array.isArray(tiles)) {
+            throw new Error(
+                `Level ${authoredLevel.id}: gates for switch ${switchId} must be an array.`
+            );
+        }
+
+        const copiedTiles = tiles.map((tile, tileIndex) => {
+            validateSwitchCoordinate(
+                authoredLevel,
+                tile,
+                `gate ${tileIndex + 1} for switch ${switchId}`
+            );
+
+            const coordinate = positionKey(tile);
+
+            if (wallPositions.has(coordinate)) {
+                throw new Error(
+                    `Level ${authoredLevel.id}: switch gate ${coordinate} cannot be placed on a wall.`
+                );
+            }
+
+            if (gatePositions.has(coordinate)) {
+                throw new Error(
+                    `Level ${authoredLevel.id}: duplicate switch gate at ${coordinate}.`
+                );
+            }
+
+            gatePositions.add(coordinate);
+            return [...tile];
+        });
+
+        gateSwitchIds.add(switchId);
+        return { switchId, tiles: copiedTiles };
+    });
+
+    return { switches, switchGates };
+}
+
+function validateSwitchCoordinate(authoredLevel, position, label) {
+    const validShape =
+        Array.isArray(position) &&
+        position.length === 2 &&
+        position.every(Number.isInteger);
+
+    if (!validShape) {
+        throw new Error(
+            `Level ${authoredLevel.id}: ${label} has an invalid position.`
+        );
+    }
+
+    const [row, col] = position;
+
+    if (
+        row < 0 ||
+        row >= authoredLevel.size ||
+        col < 0 ||
+        col >= authoredLevel.size
+    ) {
+        throw new Error(
+            `Level ${authoredLevel.id}: ${label} is out of bounds.`
+        );
+    }
 }
 
 // Invalid mechanic data is rejected before a level can be played or solved.
@@ -223,6 +389,22 @@ function collectOneWaysOnPath(levelToCheck, path) {
     return visitedOneWays;
 }
 
+function collectSwitchesOnPath(levelToCheck, path) {
+    const activeSwitches = new Set();
+
+    path.forEach(position => {
+        const gameSwitch = levelToCheck.switchByPosition.get(
+            positionKey(position)
+        );
+
+        if (gameSwitch) {
+            activeSwitches.add(gameSwitch.id);
+        }
+    });
+
+    return activeSwitches;
+}
+
 function createAttemptState(levelToStart) {
     const start = {
         row: levelToStart.start[0],
@@ -233,6 +415,10 @@ function createAttemptState(levelToStart) {
         path: [start],
         collectedKeys: collectKeysOnPath(levelToStart, [start]),
         visitedOneWays: collectOneWaysOnPath(
+            levelToStart,
+            [start]
+        ),
+        activeSwitches: collectSwitchesOnPath(
             levelToStart,
             [start]
         ),
@@ -286,6 +472,16 @@ function applyMove(levelToPlay, state, destination, options = {}) {
         return { accepted: false, state };
     }
 
+    const switchGate =
+        levelToPlay.switchGateByPosition.get(destinationKey);
+
+    if (
+        switchGate &&
+        !state.activeSwitches.has(switchGate.switchId)
+    ) {
+        return { accepted: false, state };
+    }
+
     const existingIndex = state.path.findIndex(position =>
         samePosition(position, destination)
     );
@@ -314,6 +510,10 @@ function applyMove(levelToPlay, state, destination, options = {}) {
                     newPath
                 ),
                 visitedOneWays: collectOneWaysOnPath(
+                    levelToPlay,
+                    newPath
+                ),
+                activeSwitches: collectSwitchesOnPath(
                     levelToPlay,
                     newPath
                 ),
@@ -357,6 +557,14 @@ function applyMove(levelToPlay, state, destination, options = {}) {
         visitedOneWays.add(destinationKey);
     }
 
+    const activeSwitches = new Set(state.activeSwitches);
+    const foundSwitch =
+        levelToPlay.switchByPosition.get(destinationKey);
+
+    if (foundSwitch) {
+        activeSwitches.add(foundSwitch.id);
+    }
+
     const isGoal =
         destination.row === levelToPlay.goal[0] &&
         destination.col === levelToPlay.goal[1];
@@ -379,6 +587,7 @@ function applyMove(levelToPlay, state, destination, options = {}) {
             path: newPath,
             collectedKeys,
             visitedOneWays,
+            activeSwitches,
             complete
         }
     };
@@ -477,7 +686,7 @@ function directionArrow(direction) {
     }[direction];
 }
 
-function updateTileAccessibleLabel(tile, isUnlocked = false) {
+function updateTileAccessibleLabel(tile) {
     const labels = [];
 
     if (tile.classList.contains("start")) {
@@ -493,12 +702,30 @@ function updateTileAccessibleLabel(tile, isUnlocked = false) {
     }
 
     if (tile.classList.contains("lock")) {
-        labels.push(isUnlocked ? "Unlocked gate" : "Locked gate");
+        labels.push(
+            tile.classList.contains("unlocked")
+                ? "Unlocked gate"
+                : "Locked gate"
+        );
     }
 
     if (tile.classList.contains("one-way")) {
         labels.push(
             `Required one-way tile, move ${tile.dataset.direction}`
+        );
+    }
+
+    if (tile.classList.contains("switch")) {
+        labels.push(`Switch ${tile.dataset.switchId}`);
+    }
+
+    if (tile.classList.contains("switch-gate")) {
+        const gateState = tile.classList.contains("switch-gate-open")
+            ? "Open"
+            : "Closed";
+
+        labels.push(
+            `${gateState} switch gate for ${tile.dataset.switchId}`
         );
     }
 
@@ -523,6 +750,23 @@ function handleThemeChange(event) {
     applyTheme();
 }
 
+function levelInstructions(levelToDescribe) {
+    const instructions = ["Start at the circle."];
+
+    if (levelToDescribe.oneWays.length > 0) {
+        instructions.push("Visit every arrow.");
+    }
+
+    if (levelToDescribe.switches.length > 0) {
+        instructions.push(
+            "Keep switches in your path to open matching gates."
+        );
+    }
+
+    instructions.push("Then reach the star.");
+    return instructions.join(" ");
+}
+
 // ======================================
 // Board rendering
 // ======================================
@@ -534,9 +778,7 @@ function createBoard() {
     levelNumber.textContent =
         `Level ${currentLevelIndex + 1}`;
     levelTitle.textContent = level.title;
-    gameMessage.textContent = level.oneWays.length > 0
-        ? "Start at the circle. Visit every arrow, then reach the star."
-        : "Start at the circle and reach the star.";
+    gameMessage.textContent = levelInstructions(level);
 
     const savedBest = bestMovesByLevel[level.id];
     const optimalMoves = findShortestPathLength(level);
@@ -618,6 +860,26 @@ function createBoard() {
                 tile.dataset.arrow = directionArrow(displayDirection);
             }
 
+            const switchAtPosition =
+                level.switchByPosition.get(coordinate);
+
+            if (switchAtPosition) {
+                tile.classList.add("switch");
+                tile.dataset.switchId = switchAtPosition.id;
+                tile.dataset.switchLabel = switchAtPosition.id;
+            }
+
+            const switchGateAtPosition =
+                level.switchGateByPosition.get(coordinate);
+
+            if (switchGateAtPosition) {
+                tile.classList.add("switch-gate");
+                tile.dataset.switchId =
+                    switchGateAtPosition.switchId;
+                tile.dataset.switchLabel =
+                    switchGateAtPosition.switchId;
+            }
+
             updateTileAccessibleLabel(tile);
 
             tile.addEventListener(
@@ -639,6 +901,9 @@ function renderAttemptState() {
     const collectedKeys = attempt
         ? attempt.collectedKeys
         : new Set();
+    const activeSwitches = attempt
+        ? attempt.activeSwitches
+        : new Set();
 
     document.querySelectorAll(".tile").forEach(tile => {
         const coordinate =
@@ -654,8 +919,16 @@ function renderAttemptState() {
                 collectedKeys.has(tile.dataset.keyId);
 
             tile.classList.toggle("unlocked", isUnlocked);
-            updateTileAccessibleLabel(tile, isUnlocked);
         }
+
+        if (tile.classList.contains("switch-gate")) {
+            tile.classList.toggle(
+                "switch-gate-open",
+                activeSwitches.has(tile.dataset.switchId)
+            );
+        }
+
+        updateTileAccessibleLabel(tile);
     });
 }
 
@@ -738,10 +1011,14 @@ function solverStateKey(levelToSolve, state) {
     const visitedOneWays = [...state.visitedOneWays]
         .sort()
         .join("|");
+    const activeSwitches = [...state.activeSwitches]
+        .sort()
+        .join("-");
 
     // Keep the original BFS visitation behavior: position plus collected keys.
     // applyMove still checks each candidate path's no-revisit rule.
-    return `${positionKey(position)};${inventory};${visitedOneWays}`;
+    return `${positionKey(position)};${inventory};` +
+        `${visitedOneWays};${activeSwitches}`;
 }
 
 function findShortestPathLength(levelToSolve) {

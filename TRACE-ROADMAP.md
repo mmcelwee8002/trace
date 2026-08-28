@@ -68,7 +68,9 @@ Chapters can remain mostly behind the scenes unless a future level-select screen
 
 ---
 
-## 2. Switch-Controlled Gates
+## 2. Switch-Controlled Gates 
+
+## completed
 
 Recommended next mechanic after one-way tiles.
 

@@ -16,6 +16,10 @@
   --gate-unlocked-border: #22d3ee;
   --one-way-background: #6d28d9;
   --one-way-symbol: #ffffff;
+  --switch-background: #7c3aed;
+  --switch-gate-locked-background: #be123c;
+  --switch-gate-open-background: #0f766e;
+  --switch-gate-open-border: #5eead4;
   --symbol-color: #ffffff;
   --path-color: #ffffff;
   --control-background: #334155;
@@ -40,6 +44,10 @@
   --gate-unlocked-border: #ffffff;
   --one-way-background: #333333;
   --one-way-symbol: #ffff00;
+  --switch-background: #4b0082;
+  --switch-gate-locked-background: #8b0000;
+  --switch-gate-open-background: #005f56;
+  --switch-gate-open-border: #ffffff;
   --symbol-color: #ffffff;
   --path-color: #ffff00;
   --control-background: #222222;
@@ -64,6 +72,10 @@
   --gate-unlocked-border: #8bdcf1;
   --one-way-background: #5b478f;
   --one-way-symbol: #ffffff;
+  --switch-background: #6b4c9a;
+  --switch-gate-locked-background: #9c245f;
+  --switch-gate-open-background: #176b67;
+  --switch-gate-open-border: #9ae6dc;
   --symbol-color: #ffffff;
   --path-color: #ffffff;
   --control-background: #354761;
@@ -252,6 +264,18 @@ body {
     content: "□";
 }
 
+.tile.switch::after {
+    content: attr(data-switch-label);
+}
+
+.tile.switch-gate::after {
+    content: attr(data-switch-label) "▥";
+}
+
+.tile.switch-gate.switch-gate-open::after {
+    content: attr(data-switch-label) "□";
+}
+
 /* One-way arrows use their own layer so they can coexist with other symbols. */
 .tile.one-way {
     background: var(--one-way-background);
@@ -271,7 +295,9 @@ body {
 .tile.one-way.start::after,
 .tile.one-way.goal::after,
 .tile.one-way.key::after,
-.tile.one-way.lock::after {
+.tile.one-way.lock::after,
+.tile.one-way.switch::after,
+.tile.one-way.switch-gate::after {
     position: absolute;
     right: 8%;
     bottom: 8%;
@@ -376,6 +402,19 @@ body {
 .tile.unlocked {
     background: var(--gate-unlocked-background);
     border: 2px solid var(--gate-unlocked-border);
+}
+
+.tile.switch {
+    background: var(--switch-background);
+}
+
+.tile.switch-gate {
+    background: var(--switch-gate-locked-background);
+}
+
+.tile.switch-gate-open {
+    background: var(--switch-gate-open-background);
+    border: 2px solid var(--switch-gate-open-border);
 }
 
 @media (max-width: 380px) {
