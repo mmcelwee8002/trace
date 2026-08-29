@@ -736,7 +736,7 @@ const levels = [
     switches: [
         {
             id: "S1",
-            position: [6, 2]
+            position: [6, 1]
         }
     ],
 
