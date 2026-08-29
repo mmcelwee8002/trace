@@ -308,10 +308,24 @@ function testDynamicPath() {
     );
 }
 
-function createPathBasedCandidate(targetLength = 24) {
-    const size = 9;
-    const start = [8, 0];
-    const goal = [0, 8];
+function chooseBoardSize(targetLength) {
+    if (targetLength <= 28) {
+        return 9;
+    }
+
+    if (targetLength <= 40) {
+        return 11;
+    }
+
+    return 15;
+}
+
+
+
+function createPathBasedCandidate(targetLength = 44) {
+    const size = chooseBoardSize(targetLength);
+    const start = [size - 1, 0];
+    const goal = [0, size - 1];
 
     let path =
         createDynamicPath(
@@ -431,6 +445,11 @@ function testPathCandidate() {
         "Path candidate walls:",
         candidate.walls.length
     );
+console.log(
+    "Path candidate board size:",
+    candidate.size
+);
+
 
 
 }
