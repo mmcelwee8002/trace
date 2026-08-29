@@ -17,10 +17,6 @@ function automationReady() {
     );
 }
 
-
-
-
-
 function createRandomWallCandidate() {
     const size = 9;
 
