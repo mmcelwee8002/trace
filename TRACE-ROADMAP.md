@@ -434,3 +434,31 @@ Before release:
 The goal is to stop inventing new mechanics once Trace has enough variety for the generator to create interesting combinations.
 
 
+## Generated Content Modes
+
+### Scheduled Campaign Expansion
+- Launch with a fixed library of generated and validated levels.
+- Target initial campaign size: 50–100+ levels.
+- Publish additional canonical levels on a regular schedule, such as 10 per week.
+- Every player receives the same numbered levels in the same order.
+- Generated levels are solved, scored, validated, and frozen before publication.
+- Previously published levels never change.
+- Difficulty should increase through mechanic interaction and planning, not only move count or board size.
+
+### Random Challenge Mode
+- Player can generate an optional one-off puzzle from the Options menu.
+- Difficulty choices:
+  - Medium
+  - Hard
+  - Extreme
+  - Are You Sure?
+- Difficulty profile controls:
+  - Board size
+  - Target solution length
+  - Number of mechanics
+  - Mechanic combinations
+  - Required ordering
+  - Branching / false routes
+  - Detour requirements
+- Generated puzzle must pass the same solver, validation, and quality rules as campaign levels.
+- Random Challenge levels do not affect canonical campaign numbering.
