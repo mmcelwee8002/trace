@@ -153,48 +153,214 @@ function createStructuredWallCandidate() {
     };
 }
 
-function createPathBasedCandidate() {
-    const size = 9;
-    const targetLength = 24;
-    const start = [8, 0];
-    const goal = [0, 8];
 
-    const path = [];
+function getNeighbors(row, col, size) {
+    const neighbors = [
+        [row - 1, col],
+        [row + 1, col],
+        [row, col - 1],
+        [row, col + 1]
+    ];
 
-    let row = start[0];
-    let col = start[1];
+    return neighbors.filter(
+        ([r, c]) =>
+            r >= 0 &&
+            r < size &&
+            c >= 0 &&
+            c < size
+    );
+}
 
-    path.push([row, col]);
+function pathContains(path, row, col) {
+    return path.some(
+        ([r, c]) =>
+            r === row &&
+            c === col
+    );
+}
 
-    function walkTo(targetRow, targetCol) {
-        while (row !== targetRow) {
-            row += targetRow > row ? 1 : -1;
-            path.push([row, col]);
+
+function createDynamicPath(size, start, goal, targetLength) {
+    const maxAttempts = 200;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        const path = [
+            [start[0], start[1]]
+        ];
+
+        let currentRow = start[0];
+        let currentCol = start[1];
+
+        while (path.length - 1 < targetLength) {
+            const neighbors =
+                getNeighbors(
+                    currentRow,
+                    currentCol,
+                    size
+                );
+
+            const unusedNeighbors =
+                neighbors.filter(
+                    ([row, col]) => {
+                        const isUsed =
+                            pathContains(
+                                path,
+                                row,
+                                col
+                            );
+
+                        const entersGoalEarly =
+                            row === goal[0] &&
+                            col === goal[1] &&
+                            path.length !== targetLength;
+
+                        const touchesEarlierPath =
+                            getNeighbors(
+                                row,
+                                col,
+                                size
+                            ).some(
+                                ([neighborRow, neighborCol]) =>
+                                    pathContains(
+                                        path,
+                                        neighborRow,
+                                        neighborCol
+                                    ) &&
+                                    !(
+                                        neighborRow === currentRow &&
+                                        neighborCol === currentCol
+                                    )
+                            );
+
+                        return !isUsed &&
+                            !entersGoalEarly &&
+                            !touchesEarlierPath;
+                    }
+                );
+
+            if (unusedNeighbors.length === 0) {
+                break;
+            }
+
+            const next =
+                unusedNeighbors[
+                Math.floor(
+                    Math.random() *
+                    unusedNeighbors.length
+                )
+                ];
+
+            currentRow = next[0];
+            currentCol = next[1];
+
+            path.push([
+                currentRow,
+                currentCol
+            ]);
         }
 
-        while (col !== targetCol) {
-            col += targetCol > col ? 1 : -1;
-            path.push([row, col]);
+        const lastTile =
+            path[path.length - 1];
+
+        const endsAtGoal =
+            lastTile[0] === goal[0] &&
+            lastTile[1] === goal[1];
+
+        if (
+            path.length - 1 === targetLength &&
+            endsAtGoal
+        ) {
+            console.log(
+                "Dynamic path found after attempts:",
+                attempt
+            );
+
+            return path;
         }
     }
 
-    if (targetLength <= 24) {
-        walkTo(4, 0);
-        walkTo(4, 6);
-        walkTo(8, 6);
-        walkTo(8, 8);
-        walkTo(0, 8);
-    } else {
-        walkTo(6, 0);
-        walkTo(6, 6);
-        walkTo(8, 6);
-        walkTo(8, 8);
-        walkTo(4, 8);
-        walkTo(4, 2);
-        walkTo(2, 2);
-        walkTo(2, 6);
-        walkTo(0, 6);
-        walkTo(0, 8);
+    return null;
+}
+function testDynamicPath() {
+    const path =
+        createDynamicPath(
+            9,
+            [8, 0],
+            [0, 8],
+            24
+        );
+
+    if (path === null) {
+        console.log(
+            "Dynamic path: no valid path found"
+        );
+        return;
+    }
+
+    console.log(
+        "Dynamic path length:",
+        path.length - 1
+    );
+
+    console.log(
+        "Dynamic path:",
+        path
+    );
+}
+
+function createPathBasedCandidate(targetLength = 24) {
+    const size = 9;
+    const start = [8, 0];
+    const goal = [0, 8];
+
+    let path =
+        createDynamicPath(
+            size,
+            start,
+            goal,
+            targetLength
+        );
+
+    // Retain the old hard-coded routes as a safe fallback while
+    // the dynamic path generator is being verified.
+    if (path === null) {
+        path = [];
+
+        let row = start[0];
+        let col = start[1];
+
+        path.push([row, col]);
+
+        function walkTo(targetRow, targetCol) {
+            while (row !== targetRow) {
+                row += targetRow > row ? 1 : -1;
+                path.push([row, col]);
+            }
+
+            while (col !== targetCol) {
+                col += targetCol > col ? 1 : -1;
+                path.push([row, col]);
+            }
+        }
+
+        if (targetLength <= 24) {
+            walkTo(4, 0);
+            walkTo(4, 6);
+            walkTo(8, 6);
+            walkTo(8, 8);
+            walkTo(0, 8);
+        } else {
+            walkTo(6, 0);
+            walkTo(6, 6);
+            walkTo(8, 6);
+            walkTo(8, 8);
+            walkTo(4, 8);
+            walkTo(4, 2);
+            walkTo(2, 2);
+            walkTo(2, 6);
+            walkTo(0, 6);
+            walkTo(0, 8);
+        }
     }
 
     const walls = [];
@@ -230,7 +396,7 @@ function createPathBasedCandidate() {
         lockGroups: [],
 
         requiredArrows: [],
-
+        targetLength,
         path
     };
 }
@@ -247,6 +413,11 @@ function testPathCandidate() {
         findShortestPathLength(normalized);
 
     console.log(
+        "Path candidate target:",
+        candidate.targetLength
+    );
+
+    console.log(
         "Path candidate planned length:",
         candidate.path.length - 1
     );
@@ -260,6 +431,8 @@ function testPathCandidate() {
         "Path candidate walls:",
         candidate.walls.length
     );
+
+
 }
 
 
@@ -269,4 +442,4 @@ function testPathCandidate() {
 
 automationReady();
 testPathCandidate();
-
+testDynamicPath();
