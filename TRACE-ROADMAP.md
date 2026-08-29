@@ -462,3 +462,56 @@ The goal is to stop inventing new mechanics once Trace has enough variety for th
   - Detour requirements
 - Generated puzzle must pass the same solver, validation, and quality rules as campaign levels.
 - Random Challenge levels do not affect canonical campaign numbering.
+
+
+## Generated Level Publishing Pipeline
+
+- Generated levels should move through three states:
+  - Generated
+  - Approved
+  - Published
+- A generated level should never automatically become part of the campaign.
+- Automation should generate a larger reserve of validated candidate levels than are immediately needed.
+- Target launch campaign: approximately 50–100 published levels.
+- Maintain an unpublished reserve of approved levels for future releases.
+- Potential release cadence: approximately 5–10 new canonical levels per week.
+- Every numbered campaign level must be identical for every player.
+- Once published, a numbered level should remain frozen and never regenerate or change.
+- Exact duplicate detection must compare new candidates against previously accepted/published levels.
+- Near-duplicate / similarity detection should be added later to prevent repetitive-feeling levels.
+- Initially, campaign level data can remain in Git with the rest of the project.
+- A backend/database can be introduced later if scheduled publishing, accounts, cloud saves, leaderboards, or other online features justify it.
+
+
+## Native App / Store Readiness
+
+Trace should remain portable so the existing web game can later be packaged for iOS and Android without rebuilding the core game.
+
+Preserve compatibility for:
+- Game rules and applyMove()
+- Solver
+- Level catalogs
+- Automation/generation
+- Rendering
+- Touch/pointer controls
+- Themes and accessibility
+- Player progression
+
+Before native packaging, review:
+- Mobile responsive layout
+- iPhone/Android safe areas and notches
+- Touch and gesture behavior
+- Offline play
+- Local storage and future storage migration
+- App icons
+- Splash screens
+- App lifecycle/resume behavior
+- iOS and Android packaging requirements
+- App Store and Google Play submission requirements
+- Privacy disclosures and policies if analytics/accounts are later added
+
+Potential distribution paths:
+1. Web
+2. Progressive Web App (PWA)
+3. Native iOS/Android wrapper
+4. App Store / Google Play release
