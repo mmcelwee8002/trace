@@ -446,10 +446,23 @@ footer {
     padding: 12px 6px;
     font-size: 0.85rem;
   }
+
+  footer {
+    max-width: calc(100% - 24px);
+    margin: 20px auto 10px;
+    padding: 8px 12px;
+    box-sizing: border-box;
+  }
+
+  footer p {
+    margin: 0;
+    overflow-wrap: anywhere;
+  }
 }
 
 @media (max-height: 800px) {
   body {
-    align-items: flex-start;
+    justify-content: flex-start;
+    align-items: center;
   }
 }
