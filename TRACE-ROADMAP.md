@@ -132,7 +132,7 @@ Requirements before implementation:
 # Future Mechanic Backlog
 
 - Break-through token
-- Temporary switches
+- ~~Temporary switches~~ — Implemented as switch-controlled gates
 - Rotating gates
 - Ice / sliding tiles
 - Required zones
@@ -182,6 +182,46 @@ Reject a candidate if:
 - the layout is too similar to an existing level
 
 For required one-way levels, the solver must find a solution that includes every required arrow.
+
+## Automated Level Generation Rules
+
+### Hard requirements
+- Level must be solvable.
+- Solver must return a numeric Optimal value.
+- Start and goal must be reachable only through legal gameplay.
+- No mechanic may be placed illegally or overlap incompatible tiles.
+- Required mechanics must actually be required by every valid solution.
+- Generated levels must respect the no-revisit path rule.
+
+### Quality requirements
+- Reject trivial straight-line or corridor-only solutions.
+- Reject mechanics that can simply be bypassed.
+- Prefer meaningful branching and route decisions.
+- Avoid excessive empty space or meaningless wall noise.
+- Difficulty should come from planning, not only path length.
+
+### Difficulty signals
+- Optimal move count.
+- Number of solver states explored.
+- Number of meaningful branch points.
+- Number of required mechanics.
+- Number of interacting mechanics.
+- Required ordering between mechanics.
+- Number of plausible routes that eventually fail.
+- Distance between early decisions and their consequences.
+
+### Mechanic architecture
+Each mechanic should define:
+- Schema/data representation.
+- Placement rules.
+- Validation rules.
+- Runtime behavior through applyMove().
+- Solver state requirements.
+- Generator placement strategy.
+- Test for whether the mechanic is actually required.
+- Difficulty contribution.
+
+
 
 ## Generator Workflow
 
@@ -392,3 +432,5 @@ Before release:
 11. Add Daily / Endless later
 
 The goal is to stop inventing new mechanics once Trace has enough variety for the generator to create interesting combinations.
+
+

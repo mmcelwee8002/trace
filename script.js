@@ -1014,11 +1014,18 @@ function solverStateKey(levelToSolve, state) {
     const activeSwitches = [...state.activeSwitches]
         .sort()
         .join("-");
+    const usedPath = levelToSolve.switches.length > 0
+        ? state.path
+            .map(positionKey)
+            .sort()
+            .join("|")
+        : "";
 
-    // Keep the original BFS visitation behavior: position plus collected keys.
-    // applyMove still checks each candidate path's no-revisit rule.
+    // Switch routes can reach the same position and mechanic state through
+    // different used cells. Those histories have different legal futures
+    // because Trace never allows an older path cell to be revisited.
     return `${positionKey(position)};${inventory};` +
-        `${visitedOneWays};${activeSwitches}`;
+        `${visitedOneWays};${activeSwitches};${usedPath}`;
 }
 
 function findShortestPathLength(levelToSolve) {
