@@ -786,15 +786,126 @@ function addRequiredArrowToCandidate(candidate) {
         structuredClone(candidate);
 
     updated.requiredArrows = [
-        {
-            position: current,
-            direction
-        }
-    ];
+    {
+        position: current,
+        direction
+    }
+];
 
-    return updated;
+if (!validateRequiredArrow(updated)) {
+    return null;
 }
 
+return updated;
+}
+
+
+function validateRequiredArrow(candidate) {
+    if (
+        !candidate ||
+        !candidate.path ||
+        !candidate.requiredArrows ||
+        candidate.requiredArrows.length === 0
+    ) {
+        return false;
+    }
+
+    const arrow =
+        candidate.requiredArrows[0];
+
+    const path = candidate.path;
+
+    const arrowIndex =
+        path.findIndex(
+            ([row, col]) =>
+                row === arrow.position[0] &&
+                col === arrow.position[1]
+        );
+
+    if (
+        arrowIndex === -1 ||
+        arrowIndex >= path.length - 1
+    ) {
+        return false;
+    }
+
+    const current =
+        path[arrowIndex];
+
+    const next =
+        path[arrowIndex + 1];
+
+    const rowChange =
+        next[0] - current[0];
+
+    const colChange =
+        next[1] - current[1];
+
+    let expectedDirection = null;
+
+    if (rowChange === -1) {
+        expectedDirection = "up";
+    } else if (rowChange === 1) {
+        expectedDirection = "down";
+    } else if (colChange === -1) {
+        expectedDirection = "left";
+    } else if (colChange === 1) {
+        expectedDirection = "right";
+    }
+
+    if (
+        expectedDirection === null ||
+        arrow.direction !== expectedDirection
+    ) {
+        return false;
+    }
+
+    const normalized =
+        normalizeLevel(candidate);
+
+    const optimal =
+        findShortestPathLength(normalized);
+
+    return (
+        optimal !== null &&
+        optimal === path.length - 1
+    );
+}
+
+function addSwitchAndArrowToCandidate(candidate) {
+    if (!candidate) {
+        return null;
+    }
+
+    const withSwitch =
+        addSwitchGateToCandidate(candidate);
+
+    if (withSwitch === null) {
+        return null;
+    }
+
+    const withArrow =
+        addRequiredArrowToCandidate(withSwitch);
+
+    if (withArrow === null) {
+        return null;
+    }
+
+    const normalized =
+        normalizeLevel(withArrow);
+
+    const optimal =
+        findShortestPathLength(normalized);
+
+    if (
+        optimal === null ||
+        optimal !== withArrow.path.length - 1
+    ) {
+        return null;
+    }
+
+    return withArrow;
+}
 
 //Test Functions 
 
@@ -1128,6 +1239,93 @@ function testRequiredArrowRequirement() {
     );
 }
 
+function testRequiredArrowValidation() {
+    const baseCandidate =
+        createPathBasedCandidate(24);
+
+    if (baseCandidate === null) {
+        console.log(
+            "Required arrow validation test: base generation failed"
+        );
+        return;
+    }
+
+    const arrowCandidate =
+        addRequiredArrowToCandidate(baseCandidate);
+
+    if (arrowCandidate === null) {
+        console.log(
+            "Required arrow validation test: arrow placement failed"
+        );
+        return;
+    }
+
+    const isValid =
+        validateRequiredArrow(arrowCandidate);
+
+    console.log(
+        "Required arrow validation:",
+        isValid
+    );
+}
+
+function testSwitchAndArrowCandidate() {
+    const baseCandidate =
+        createPathBasedCandidate(24);
+
+    if (baseCandidate === null) {
+        console.log(
+            "Combined mechanic test: base generation failed"
+        );
+        return;
+    }
+
+    const combinedCandidate =
+        addSwitchAndArrowToCandidate(baseCandidate);
+
+    if (combinedCandidate === null) {
+        console.log(
+            "Combined mechanic test: placement failed"
+        );
+        return;
+    }
+
+    const normalized =
+        normalizeLevel(combinedCandidate);
+
+    const optimal =
+        findShortestPathLength(normalized);
+
+    console.log(
+        "Combined mechanic target:",
+        combinedCandidate.targetLength
+    );
+
+    console.log(
+        "Combined mechanic planned length:",
+        combinedCandidate.path.length - 1
+    );
+
+    console.log(
+        "Combined mechanic optimal:",
+        optimal
+    );
+
+    console.log(
+        "Combined switch:",
+        combinedCandidate.switches[0]
+    );
+
+    console.log(
+        "Combined gate:",
+        combinedCandidate.switchGates[0]
+    );
+
+    console.log(
+        "Combined arrow:",
+        combinedCandidate.requiredArrows[0]
+    );
+}
 
 
 automationReady();
@@ -1141,3 +1339,5 @@ testSwitchRequirement();
 testRequiredSwitchValidation();
 testRequiredArrowCandidate();
 testRequiredArrowRequirement();
+testRequiredArrowValidation();
+testSwitchAndArrowCandidate();
