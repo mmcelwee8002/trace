@@ -505,18 +505,65 @@ console.log(
 }
 
 function createCandidateFingerprint(candidate) {
-    const normalizedWalls =
-        [...candidate.walls]
+    const normalizeCoords = (coords = []) =>
+        coords
             .map(([row, col]) => `${row},${col}`)
             .sort();
+
+    const normalizeKeys = (keys = []) =>
+        keys
+            .map(key => ({
+                id: key.id,
+                position: `${key.position[0]},${key.position[1]}`
+            }))
+            .sort((a, b) => a.id.localeCompare(b.id));
+
+    const normalizeLockGroups = (groups = []) =>
+        groups
+            .map(group => ({
+                keyId: group.keyId,
+                tiles: normalizeCoords(group.tiles)
+            }))
+            .sort((a, b) => a.keyId.localeCompare(b.keyId));
+
+    const normalizeSwitches = (switches = []) =>
+        switches
+            .map(sw => ({
+                id: sw.id,
+                position: `${sw.position[0]},${sw.position[1]}`
+            }))
+            .sort((a, b) => a.id.localeCompare(b.id));
+
+    const normalizeSwitchGates = (groups = []) =>
+        groups
+            .map(group => ({
+                switchId: group.switchId,
+                tiles: normalizeCoords(group.tiles)
+            }))
+            .sort((a, b) =>
+                a.switchId.localeCompare(b.switchId)
+            );
 
     return JSON.stringify({
         size: candidate.size,
         start: candidate.start,
         goal: candidate.goal,
-        walls: normalizedWalls
+        walls: normalizeCoords(candidate.walls),
+
+        keys: normalizeKeys(candidate.keys),
+        lockGroups:
+            normalizeLockGroups(candidate.lockGroups),
+
+        switches:
+            normalizeSwitches(candidate.switches),
+        switchGates:
+            normalizeSwitchGates(candidate.switchGates),
+
+        requiredArrows:
+            candidate.requiredArrows ?? []
     });
 }
+
 
 function isDuplicateCandidate(candidate) {
     const fingerprint =
@@ -530,6 +577,226 @@ function isDuplicateCandidate(candidate) {
     return false;
 }
 
+function addSwitchGateToCandidate(
+    candidate,
+    maxAttempts = 50
+) {
+    if (!candidate || !candidate.path) {
+        return null;
+    }
+
+    const path = candidate.path;
+
+    if (path.length < 10) {
+        return null;
+    }
+
+    for (
+        let attempt = 1;
+        attempt <= maxAttempts;
+        attempt++
+    ) {
+        const minSwitchIndex = 2;
+
+        const maxSwitchIndex =
+            Math.floor(path.length * 0.45);
+
+        const switchIndex =
+            minSwitchIndex +
+            Math.floor(
+                Math.random() *
+                (maxSwitchIndex - minSwitchIndex + 1)
+            );
+
+        const minGateIndex =
+            switchIndex + 3;
+
+        const maxGateIndex =
+            path.length - 2;
+
+        if (minGateIndex > maxGateIndex) {
+            continue;
+        }
+
+        const gateIndex =
+            minGateIndex +
+            Math.floor(
+                Math.random() *
+                (maxGateIndex - minGateIndex + 1)
+            );
+
+        const switchPosition =
+            path[switchIndex];
+
+        const gatePosition =
+            path[gateIndex];
+
+        const updated =
+            structuredClone(candidate);
+
+        updated.switches = [
+            {
+                id: "S1",
+                position: switchPosition
+            }
+        ];
+
+        updated.switchGates = [
+            {
+                switchId: "S1",
+                tiles: [
+                    gatePosition
+                ]
+            }
+        ];
+
+        if (!validateRequiredSwitch(updated)) {
+            continue;
+        }
+
+        console.log(
+            "Valid switch placement found after attempts:",
+            attempt
+        );
+
+        return updated;
+    }
+
+    return null;
+}
+
+
+function validateRequiredSwitch(candidate) {
+    if (
+        !candidate ||
+        !candidate.path ||
+        !candidate.switches ||
+        !candidate.switchGates ||
+        candidate.switches.length === 0 ||
+        candidate.switchGates.length === 0
+    ) {
+        return false;
+    }
+
+    const normalized =
+        normalizeLevel(candidate);
+
+    const normalOptimal =
+        findShortestPathLength(normalized);
+
+    if (normalOptimal === null) {
+        return false;
+    }
+
+    const brokenCandidate =
+        structuredClone(candidate);
+
+    const path =
+        brokenCandidate.path;
+
+    const gatePosition =
+        brokenCandidate.switchGates[0].tiles[0];
+
+    const gateIndex =
+        path.findIndex(
+            ([row, col]) =>
+                row === gatePosition[0] &&
+                col === gatePosition[1]
+        );
+
+    if (gateIndex === -1) {
+        return false;
+    }
+
+    const lateSwitchIndex =
+        Math.min(
+            path.length - 2,
+            gateIndex + 2
+        );
+
+    if (lateSwitchIndex <= gateIndex) {
+        return false;
+    }
+
+    brokenCandidate.switches[0].position =
+        path[lateSwitchIndex];
+
+    const brokenNormalized =
+        normalizeLevel(brokenCandidate);
+
+    const brokenOptimal =
+        findShortestPathLength(
+            brokenNormalized
+        );
+
+    return brokenOptimal === null;
+}
+
+function addRequiredArrowToCandidate(candidate) {
+    if (!candidate || !candidate.path) {
+        return null;
+    }
+
+    const path = candidate.path;
+
+    if (path.length < 6) {
+        return null;
+    }
+
+    // Keep the arrow away from Start and Goal.
+    const minIndex = 2;
+    const maxIndex = path.length - 3;
+
+    const arrowIndex =
+        minIndex +
+        Math.floor(
+            Math.random() *
+            (maxIndex - minIndex + 1)
+        );
+
+    const current =
+        path[arrowIndex];
+
+    const next =
+        path[arrowIndex + 1];
+
+    const rowChange =
+        next[0] - current[0];
+
+    const colChange =
+        next[1] - current[1];
+
+    let direction = null;
+
+    if (rowChange === -1) {
+        direction = "up";
+    } else if (rowChange === 1) {
+        direction = "down";
+    } else if (colChange === -1) {
+        direction = "left";
+    } else if (colChange === 1) {
+        direction = "right";
+    }
+
+    if (direction === null) {
+        return null;
+    }
+
+    const updated =
+        structuredClone(candidate);
+
+    updated.requiredArrows = [
+        {
+            position: current,
+            direction
+        }
+    ];
+
+    return updated;
+}
+
+
+//Test Functions 
 
 function testDuplicateDetection() {
     generatedFingerprints.clear();
@@ -589,6 +856,278 @@ function testUniqueCandidateGeneration() {
     );
 }
 
+function testMechanicFingerprint() {
+    const baseCandidate =
+        createPathBasedCandidate(24);
+
+    if (baseCandidate === null) {
+        console.log(
+            "Mechanic fingerprint test: candidate generation failed"
+        );
+        return;
+    }
+
+    const withSwitch =
+        structuredClone(baseCandidate);
+
+    withSwitch.switches = [
+        {
+            id: "S1",
+            position: [6, 2]
+        }
+    ];
+
+    withSwitch.switchGates = [
+        {
+            switchId: "S1",
+            tiles: [
+                [4, 4]
+            ]
+        }
+    ];
+
+    const baseFingerprint =
+        createCandidateFingerprint(
+            baseCandidate
+        );
+
+    const switchFingerprint =
+        createCandidateFingerprint(
+            withSwitch
+        );
+
+    console.log(
+        "Mechanic fingerprints are different:",
+        baseFingerprint !== switchFingerprint
+    );
+}
+
+function testSwitchGateCandidate() {
+    const baseCandidate =
+        createPathBasedCandidate(24);
+
+    if (baseCandidate === null) {
+        console.log(
+            "Switch gate test: base candidate generation failed"
+        );
+        return;
+    }
+
+    const switchCandidate =
+        addSwitchGateToCandidate(baseCandidate);
+
+    if (switchCandidate === null) {
+        console.log(
+            "Switch gate test: mechanic placement failed"
+        );
+        return;
+    }
+
+    const normalized =
+        normalizeLevel(switchCandidate);
+
+    const optimal =
+        findShortestPathLength(normalized);
+
+    console.log(
+        "Switch gate test target:",
+        switchCandidate.targetLength
+    );
+
+    console.log(
+        "Switch gate test planned length:",
+        switchCandidate.path.length - 1
+    );
+
+    console.log(
+        "Switch gate test optimal:",
+        optimal
+    );
+
+    console.log(
+        "Switch position:",
+        switchCandidate.switches[0].position
+    );
+
+    console.log(
+        "Gate position:",
+        switchCandidate.switchGates[0].tiles[0]
+    );
+}
+
+function testSwitchRequirement() {
+    const baseCandidate =
+        createPathBasedCandidate(24);
+
+    if (baseCandidate === null) {
+        console.log(
+            "Switch requirement test: base generation failed"
+        );
+        return;
+    }
+
+    const switchCandidate =
+        addSwitchGateToCandidate(baseCandidate);
+
+    if (switchCandidate === null) {
+        console.log(
+            "Switch requirement test: mechanic placement failed"
+        );
+        return;
+    }
+
+    const brokenCandidate =
+        structuredClone(switchCandidate);
+
+    const path =
+        brokenCandidate.path;
+
+    const lateSwitchIndex =
+        Math.floor(path.length * 0.9);
+
+    brokenCandidate.switches[0].position =
+        path[lateSwitchIndex];
+
+    const normalized =
+        normalizeLevel(brokenCandidate);
+
+    const optimal =
+        findShortestPathLength(normalized);
+
+    console.log(
+        "Switch requirement test with switch after gate:",
+        optimal
+    );
+}
+
+
+function testRequiredSwitchValidation() {
+    const baseCandidate =
+        createPathBasedCandidate(24);
+
+    if (baseCandidate === null) {
+        console.log(
+            "Required switch validation test: base generation failed"
+        );
+        return;
+    }
+
+    const switchCandidate =
+        addSwitchGateToCandidate(baseCandidate);
+
+    if (switchCandidate === null) {
+        console.log(
+            "Required switch validation test: mechanic placement failed"
+        );
+        return;
+    }
+
+    const isRequired =
+        validateRequiredSwitch(switchCandidate);
+
+    console.log(
+        "Required switch validation:",
+        isRequired
+    );
+}
+
+function testRequiredArrowCandidate() {
+    const baseCandidate =
+        createPathBasedCandidate(24);
+
+    if (baseCandidate === null) {
+        console.log(
+            "Required arrow test: base generation failed"
+        );
+        return;
+    }
+
+    const arrowCandidate =
+        addRequiredArrowToCandidate(baseCandidate);
+
+    if (arrowCandidate === null) {
+        console.log(
+            "Required arrow test: arrow placement failed"
+        );
+        return;
+    }
+
+    const normalized =
+        normalizeLevel(arrowCandidate);
+
+    const optimal =
+        findShortestPathLength(normalized);
+
+    console.log(
+        "Required arrow test target:",
+        arrowCandidate.targetLength
+    );
+
+    console.log(
+        "Required arrow test planned length:",
+        arrowCandidate.path.length - 1
+    );
+
+    console.log(
+        "Required arrow test optimal:",
+        optimal
+    );
+
+    console.log(
+        "Required arrow:",
+        arrowCandidate.requiredArrows[0]
+    );
+}
+
+function testRequiredArrowRequirement() {
+    const baseCandidate =
+        createPathBasedCandidate(24);
+
+    if (baseCandidate === null) {
+        console.log(
+            "Required arrow requirement test: base generation failed"
+        );
+        return;
+    }
+
+    const arrowCandidate =
+        addRequiredArrowToCandidate(baseCandidate);
+
+    if (arrowCandidate === null) {
+        console.log(
+            "Required arrow requirement test: arrow placement failed"
+        );
+        return;
+    }
+
+    const brokenCandidate =
+        structuredClone(arrowCandidate);
+
+    const arrow =
+        brokenCandidate.requiredArrows[0];
+
+    const oppositeDirection = {
+        up: "down",
+        down: "up",
+        left: "right",
+        right: "left"
+    };
+
+    arrow.direction =
+        oppositeDirection[arrow.direction];
+
+    const normalized =
+        normalizeLevel(brokenCandidate);
+
+    const optimal =
+        findShortestPathLength(normalized);
+
+    console.log(
+        "Required arrow requirement test with reversed arrow:",
+        optimal
+    );
+}
+
 
 
 automationReady();
@@ -596,3 +1135,9 @@ testPathCandidate();
 testDynamicPath();
 testDuplicateDetection();
 testUniqueCandidateGeneration();
+testMechanicFingerprint();
+testSwitchGateCandidate();
+testSwitchRequirement();
+testRequiredSwitchValidation();
+testRequiredArrowCandidate();
+testRequiredArrowRequirement();
