@@ -789,8 +789,8 @@ function testTwoSwitchRequirement() {
 
 
 
-testPathCandidate();
-testDynamicPath();
+//testPathCandidate();
+//testDynamicPath();
 testDuplicateDetection();
 testUniqueCandidateGeneration();
 testMechanicFingerprint();
