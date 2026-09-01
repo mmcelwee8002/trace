@@ -515,3 +515,20 @@ Potential distribution paths:
 2. Progressive Web App (PWA)
 3. Native iOS/Android wrapper
 4. App Store / Google Play release
+
+
+## Automation buckets
+
+I’d probably group the rest into four phases:
+
+Phase A — Finish mechanic generation
+conflict rules → keys/gates → multi-mechanic combinations.
+
+Phase B — Decide whether a generated level is actually good
+required-mechanic checks → near-duplicates → difficulty scoring.
+
+Phase C — Scale it up
+batch generation → difficulty tiers → acceptance pipeline.
+
+Phase D — Productionize it
+persistent catalog → published fingerprints → cleanup/testing.

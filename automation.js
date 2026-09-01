@@ -872,40 +872,350 @@ function validateRequiredArrow(candidate) {
     );
 }
 
-function addSwitchAndArrowToCandidate(candidate) {
+function addSwitchAndArrowToCandidate(
+    candidate,
+    maxAttempts = 50
+) {
     if (!candidate) {
         return null;
     }
 
-    const withSwitch =
-        addSwitchGateToCandidate(candidate);
+    for (
+        let attempt = 1;
+        attempt <= maxAttempts;
+        attempt++
+    ) {
+        const withSwitch =
+            addSwitchGateToCandidate(candidate);
 
-    if (withSwitch === null) {
+        if (withSwitch === null) {
+            continue;
+        }
+
+        const withArrow =
+            addRequiredArrowToCandidate(withSwitch);
+
+        if (withArrow === null) {
+            continue;
+        }
+
+        const switchPosition =
+            withArrow.switches[0].position;
+
+        const gatePosition =
+            withArrow.switchGates[0].tiles[0];
+
+        const arrowPosition =
+            withArrow.requiredArrows[0].position;
+
+        const sameTile = (a, b) =>
+            a[0] === b[0] &&
+            a[1] === b[1];
+
+        if (
+            sameTile(
+                arrowPosition,
+                switchPosition
+            ) ||
+            sameTile(
+                arrowPosition,
+                gatePosition
+            )
+        ) {
+            continue;
+        }
+
+        const normalized =
+            normalizeLevel(withArrow);
+
+        const optimal =
+            findShortestPathLength(normalized);
+
+        if (
+            optimal === null ||
+            optimal !== withArrow.path.length - 1
+        ) {
+            continue;
+        }
+
+        console.log(
+            "Valid combined placement found after attempts:",
+            attempt
+        );
+
+        return withArrow;
+    }
+
+    return null;
+}
+
+function addKeyGateToCandidate(
+    candidate,
+    maxAttempts = 50
+) {
+    if (!candidate || !candidate.path) {
         return null;
     }
 
-    const withArrow =
-        addRequiredArrowToCandidate(withSwitch);
+    const path = candidate.path;
 
-    if (withArrow === null) {
+    if (path.length < 10) {
         return null;
+    }
+
+    for (
+        let attempt = 1;
+        attempt <= maxAttempts;
+        attempt++
+    ) {
+        const minKeyIndex = 2;
+
+        const maxKeyIndex =
+            Math.floor(path.length * 0.45);
+
+        const keyIndex =
+            minKeyIndex +
+            Math.floor(
+                Math.random() *
+                (maxKeyIndex - minKeyIndex + 1)
+            );
+
+        const minGateIndex =
+            keyIndex + 3;
+
+        const maxGateIndex =
+            path.length - 2;
+
+        if (minGateIndex > maxGateIndex) {
+            continue;
+        }
+
+        const gateIndex =
+            minGateIndex +
+            Math.floor(
+                Math.random() *
+                (maxGateIndex - minGateIndex + 1)
+            );
+
+        const keyPosition =
+            path[keyIndex];
+
+        const gatePosition =
+            path[gateIndex];
+
+        const updated =
+            structuredClone(candidate);
+
+        updated.keys = [
+            {
+                id: "A",
+                position: keyPosition
+            }
+        ];
+
+        updated.lockGroups = [
+            {
+                keyId: "A",
+                tiles: [
+                    gatePosition
+                ]
+            }
+        ];
+
+        if (!validateRequiredKey(updated)) {
+    continue;
+}
+
+console.log(
+    "Valid key placement found after attempts:",
+    attempt
+);
+
+return updated;
+    }
+
+    return null;
+}
+
+
+function validateRequiredKey(candidate) {
+    if (
+        !candidate ||
+        !candidate.path ||
+        !candidate.keys ||
+        !candidate.lockGroups ||
+        candidate.keys.length === 0 ||
+        candidate.lockGroups.length === 0
+    ) {
+        return false;
     }
 
     const normalized =
-        normalizeLevel(withArrow);
+        normalizeLevel(candidate);
 
-    const optimal =
+    const normalOptimal =
         findShortestPathLength(normalized);
 
-    if (
-        optimal === null ||
-        optimal !== withArrow.path.length - 1
-    ) {
+    if (normalOptimal === null) {
+        return false;
+    }
+
+    const brokenCandidate =
+        structuredClone(candidate);
+
+    const path =
+        brokenCandidate.path;
+
+    const gatePosition =
+        brokenCandidate.lockGroups[0].tiles[0];
+
+    const gateIndex =
+        path.findIndex(
+            ([row, col]) =>
+                row === gatePosition[0] &&
+                col === gatePosition[1]
+        );
+
+    if (gateIndex === -1) {
+        return false;
+    }
+
+    const lateKeyIndex =
+        Math.min(
+            path.length - 2,
+            gateIndex + 2
+        );
+
+    if (lateKeyIndex <= gateIndex) {
+        return false;
+    }
+
+    brokenCandidate.keys[0].position =
+        path[lateKeyIndex];
+
+    const brokenNormalized =
+        normalizeLevel(brokenCandidate);
+
+    const brokenOptimal =
+        findShortestPathLength(
+            brokenNormalized
+        );
+
+    return brokenOptimal === null;
+}
+
+function addAllCurrentMechanicsToCandidate(
+    candidate,
+    maxAttempts = 50
+) {
+    if (!candidate) {
         return null;
     }
 
-    return withArrow;
+    const sameTile = (a, b) =>
+        a[0] === b[0] &&
+        a[1] === b[1];
+
+    for (
+        let attempt = 1;
+        attempt <= maxAttempts;
+        attempt++
+    ) {
+        const withKey =
+            addKeyGateToCandidate(candidate);
+
+        if (withKey === null) {
+            continue;
+        }
+
+        const withSwitch =
+            addSwitchGateToCandidate(withKey);
+
+        if (withSwitch === null) {
+            continue;
+        }
+
+        const withArrow =
+            addRequiredArrowToCandidate(withSwitch);
+
+        if (withArrow === null) {
+            continue;
+        }
+
+        const keyPosition =
+            withArrow.keys[0].position;
+
+        const keyGatePosition =
+            withArrow.lockGroups[0].tiles[0];
+
+        const switchPosition =
+            withArrow.switches[0].position;
+
+        const switchGatePosition =
+            withArrow.switchGates[0].tiles[0];
+
+        const arrowPosition =
+            withArrow.requiredArrows[0].position;
+
+        const mechanicPositions = [
+            keyPosition,
+            keyGatePosition,
+            switchPosition,
+            switchGatePosition,
+            arrowPosition
+        ];
+
+        let hasConflict = false;
+
+        for (
+            let i = 0;
+            i < mechanicPositions.length;
+            i++
+        ) {
+            for (
+                let j = i + 1;
+                j < mechanicPositions.length;
+                j++
+            ) {
+                if (
+                    sameTile(
+                        mechanicPositions[i],
+                        mechanicPositions[j]
+                    )
+                ) {
+                    hasConflict = true;
+                }
+            }
+        }
+
+        if (hasConflict) {
+            continue;
+        }
+
+        const normalized =
+            normalizeLevel(withArrow);
+
+        const optimal =
+            findShortestPathLength(normalized);
+
+        if (
+            optimal === null ||
+            optimal !== withArrow.path.length - 1
+        ) {
+            continue;
+        }
+
+        console.log(
+            "Valid all-mechanics placement found after attempts:",
+            attempt
+        );
+
+        return withArrow;
+    }
+
+    return null;
 }
+
 
 //Test Functions 
 
@@ -1327,6 +1637,216 @@ function testSwitchAndArrowCandidate() {
     );
 }
 
+function testKeyGateCandidate() {
+    const baseCandidate =
+        createPathBasedCandidate(24);
+
+    if (baseCandidate === null) {
+        console.log(
+            "Key gate test: base generation failed"
+        );
+        return;
+    }
+
+    const keyCandidate =
+        addKeyGateToCandidate(baseCandidate);
+
+    if (keyCandidate === null) {
+        console.log(
+            "Key gate test: mechanic placement failed"
+        );
+        return;
+    }
+
+    const normalized =
+        normalizeLevel(keyCandidate);
+
+    const optimal =
+        findShortestPathLength(normalized);
+
+    console.log(
+        "Key gate test target:",
+        keyCandidate.targetLength
+    );
+
+    console.log(
+        "Key gate test planned length:",
+        keyCandidate.path.length - 1
+    );
+
+    console.log(
+        "Key gate test optimal:",
+        optimal
+    );
+
+    console.log(
+        "Generated key:",
+        keyCandidate.keys[0]
+    );
+
+    console.log(
+        "Generated gate:",
+        keyCandidate.lockGroups[0]
+    );
+}
+
+function testKeyRequirement() {
+    const baseCandidate =
+        createPathBasedCandidate(24);
+
+    if (baseCandidate === null) {
+        console.log(
+            "Key requirement test: base generation failed"
+        );
+        return;
+    }
+
+    const keyCandidate =
+        addKeyGateToCandidate(baseCandidate);
+
+    if (keyCandidate === null) {
+        console.log(
+            "Key requirement test: mechanic placement failed"
+        );
+        return;
+    }
+
+    const brokenCandidate =
+        structuredClone(keyCandidate);
+
+    const path =
+        brokenCandidate.path;
+
+    const gatePosition =
+        brokenCandidate.lockGroups[0].tiles[0];
+
+    const gateIndex =
+        path.findIndex(
+            ([row, col]) =>
+                row === gatePosition[0] &&
+                col === gatePosition[1]
+        );
+
+    const lateKeyIndex =
+        Math.min(
+            path.length - 2,
+            gateIndex + 2
+        );
+
+    brokenCandidate.keys[0].position =
+        path[lateKeyIndex];
+
+    const normalized =
+        normalizeLevel(brokenCandidate);
+
+    const optimal =
+        findShortestPathLength(normalized);
+
+    console.log(
+        "Key requirement test with key after gate:",
+        optimal
+    );
+}
+
+function testRequiredKeyValidation() {
+    const baseCandidate =
+        createPathBasedCandidate(24);
+
+    if (baseCandidate === null) {
+        console.log(
+            "Required key validation test: base generation failed"
+        );
+        return;
+    }
+
+    const keyCandidate =
+        addKeyGateToCandidate(baseCandidate);
+
+    if (keyCandidate === null) {
+        console.log(
+            "Required key validation test: mechanic placement failed"
+        );
+        return;
+    }
+
+    const isRequired =
+        validateRequiredKey(keyCandidate);
+
+    console.log(
+        "Required key validation:",
+        isRequired
+    );
+}
+
+function testAllCurrentMechanicsCandidate() {
+    const baseCandidate =
+        createPathBasedCandidate(24);
+
+    if (baseCandidate === null) {
+        console.log(
+            "All mechanics test: base generation failed"
+        );
+        return;
+    }
+
+    const candidate =
+        addAllCurrentMechanicsToCandidate(
+            baseCandidate
+        );
+
+    if (candidate === null) {
+        console.log(
+            "All mechanics test: placement failed"
+        );
+        return;
+    }
+
+    const normalized =
+        normalizeLevel(candidate);
+
+    const optimal =
+        findShortestPathLength(normalized);
+
+    console.log(
+        "All mechanics target:",
+        candidate.targetLength
+    );
+
+    console.log(
+        "All mechanics planned length:",
+        candidate.path.length - 1
+    );
+
+    console.log(
+        "All mechanics optimal:",
+        optimal
+    );
+
+    console.log(
+        "Key:",
+        candidate.keys[0].position
+    );
+
+    console.log(
+        "Key gate:",
+        candidate.lockGroups[0].tiles[0]
+    );
+
+    console.log(
+        "Switch:",
+        candidate.switches[0].position
+    );
+
+    console.log(
+        "Switch gate:",
+        candidate.switchGates[0].tiles[0]
+    );
+
+    console.log(
+        "Arrow:",
+        candidate.requiredArrows[0]
+    );
+}
 
 automationReady();
 testPathCandidate();
@@ -1341,3 +1861,7 @@ testRequiredArrowCandidate();
 testRequiredArrowRequirement();
 testRequiredArrowValidation();
 testSwitchAndArrowCandidate();
+testKeyGateCandidate();
+testKeyRequirement();
+testRequiredKeyValidation();
+testAllCurrentMechanicsCandidate();
