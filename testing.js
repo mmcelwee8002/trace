@@ -367,63 +367,7 @@ function testRequiredArrowValidation() {
     );
 }
 
-function testSwitchAndArrowCandidate() {
-    const baseCandidate =
-        createPathBasedCandidate(24);
 
-    if (baseCandidate === null) {
-        console.log(
-            "Combined mechanic test: base generation failed"
-        );
-        return;
-    }
-
-    const combinedCandidate =
-        addSwitchAndArrowToCandidate(baseCandidate);
-
-    if (combinedCandidate === null) {
-        console.log(
-            "Combined mechanic test: placement failed"
-        );
-        return;
-    }
-
-    const normalized =
-        normalizeLevel(combinedCandidate);
-
-    const optimal =
-        findShortestPathLength(normalized);
-
-    console.log(
-        "Combined mechanic target:",
-        combinedCandidate.targetLength
-    );
-
-    console.log(
-        "Combined mechanic planned length:",
-        combinedCandidate.path.length - 1
-    );
-
-    console.log(
-        "Combined mechanic optimal:",
-        optimal
-    );
-
-    console.log(
-        "Combined switch:",
-        combinedCandidate.switches[0]
-    );
-
-    console.log(
-        "Combined gate:",
-        combinedCandidate.switchGates[0]
-    );
-
-    console.log(
-        "Combined arrow:",
-        combinedCandidate.requiredArrows[0]
-    );
-}
 
 function testKeyGateCandidate() {
     const baseCandidate =
@@ -566,75 +510,7 @@ function testRequiredKeyValidation() {
     );
 }
 
-function testAllCurrentMechanicsCandidate() {
-    const baseCandidate =
-        createPathBasedCandidate(24);
 
-    if (baseCandidate === null) {
-        console.log(
-            "All mechanics test: base generation failed"
-        );
-        return;
-    }
-
-    const candidate =
-        addAllCurrentMechanicsToCandidate(
-            baseCandidate
-        );
-
-    if (candidate === null) {
-        console.log(
-            "All mechanics test: placement failed"
-        );
-        return;
-    }
-
-    const normalized =
-        normalizeLevel(candidate);
-
-    const optimal =
-        findShortestPathLength(normalized);
-
-    console.log(
-        "All mechanics target:",
-        candidate.targetLength
-    );
-
-    console.log(
-        "All mechanics planned length:",
-        candidate.path.length - 1
-    );
-
-    console.log(
-        "All mechanics optimal:",
-        optimal
-    );
-
-    console.log(
-        "Key:",
-        candidate.keys[0].position
-    );
-
-    console.log(
-        "Key gate:",
-        candidate.lockGroups[0].tiles[0]
-    );
-
-    console.log(
-        "Switch:",
-        candidate.switches[0].position
-    );
-
-    console.log(
-        "Switch gate:",
-        candidate.switchGates[0].tiles[0]
-    );
-
-    console.log(
-        "Arrow:",
-        candidate.requiredArrows[0]
-    );
-}
 
 function testTwoSwitchCandidate() {
     const baseCandidate =
@@ -932,6 +808,122 @@ function testTwoKeyRequirement() {
 
 
 
+
+
+
+
+
+
+
+
+function testMixedMechanicCandidate() {
+    const candidate =
+        createPathBasedCandidate(24);
+
+    const mixed =
+        addMechanicsToCandidate(
+            candidate,
+            {
+                keys: 2,
+                switches: 2,
+                arrows: 1
+            }
+        );
+
+    if (!mixed) {
+        console.log(
+            "Mixed mechanic candidate: failed"
+        );
+        return;
+    }
+
+    const normalized =
+        normalizeLevel(mixed);
+
+    const optimal =
+        findShortestPathLength(normalized);
+
+    console.log(
+        "Mixed target:",
+        mixed.targetLength
+    );
+
+    console.log(
+        "Mixed planned:",
+        mixed.path.length - 1
+    );
+
+    console.log(
+        "Mixed optimal:",
+        optimal
+    );
+
+    console.log(
+        "Mixed keys:",
+        mixed.keys
+    );
+
+    console.log(
+        "Mixed key gates:",
+        mixed.lockGroups
+    );
+
+    console.log(
+        "Mixed switches:",
+        mixed.switches
+    );
+
+    console.log(
+        "Mixed switch gates:",
+        mixed.switchGates
+    );
+
+    console.log(
+        "Mixed arrows:",
+        mixed.requiredArrows
+    );
+}
+
+function testMixedMechanicRequirements() {
+    const candidate =
+        createPathBasedCandidate(24);
+
+    const mixed =
+        addMechanicsToCandidate(
+            candidate,
+            {
+                keys: 2,
+                switches: 2,
+                arrows: 1
+            }
+        );
+
+    if (!mixed) {
+        console.log(
+            "Mixed requirement test: failed to create candidate"
+        );
+        return;
+    }
+
+    console.log(
+        "Mixed key groups required:",
+        validateRequiredKeyGroups(mixed)
+    );
+
+    console.log(
+        "Mixed switch groups required:",
+        validateRequiredSwitchGroups(mixed)
+    );
+
+    console.log(
+        "Mixed arrow valid:",
+        validateRequiredArrow(mixed)
+    );
+}
+
+
+
+
 //testPathCandidate();
 //testDynamicPath();
 testDuplicateDetection();
@@ -943,12 +935,18 @@ testRequiredSwitchValidation();
 testRequiredArrowCandidate();
 testRequiredArrowRequirement();
 testRequiredArrowValidation();
-testSwitchAndArrowCandidate();
+
 testKeyGateCandidate();
 testKeyRequirement();
 testRequiredKeyValidation();
-testAllCurrentMechanicsCandidate();
+
 testTwoSwitchCandidate();
-testTwoSwitchRequirement();
-testTwoKeyCandidate();
+
+
 testTwoKeyRequirement();
+
+
+
+
+testMixedMechanicCandidate();
+testMixedMechanicRequirements();

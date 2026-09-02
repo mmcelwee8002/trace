@@ -799,195 +799,10 @@ function validateRequiredKey(candidate) {
 }
 
 
-function addSwitchAndArrowToCandidate(
-    candidate,
-    maxAttempts = 50
-) {
-    if (!candidate) {
-        return null;
-    }
-
-    for (
-        let attempt = 1;
-        attempt <= maxAttempts;
-        attempt++
-    ) {
-        const withSwitch =
-            addSwitchGateToCandidate(candidate);
-
-        if (withSwitch === null) {
-            continue;
-        }
-
-        const withArrow =
-            addRequiredArrowToCandidate(withSwitch);
-
-        if (withArrow === null) {
-            continue;
-        }
-
-        const switchPosition =
-            withArrow.switches[0].position;
-
-        const gatePosition =
-            withArrow.switchGates[0].tiles[0];
-
-        const arrowPosition =
-            withArrow.requiredArrows[0].position;
-
-        const sameTile = (a, b) =>
-            a[0] === b[0] &&
-            a[1] === b[1];
-
-        if (
-            sameTile(
-                arrowPosition,
-                switchPosition
-            ) ||
-            sameTile(
-                arrowPosition,
-                gatePosition
-            )
-        ) {
-            continue;
-        }
-
-        const normalized =
-            normalizeLevel(withArrow);
-
-        const optimal =
-            findShortestPathLength(normalized);
-
-        if (
-            optimal === null ||
-            optimal !== withArrow.path.length - 1
-        ) {
-            continue;
-        }
-
-        console.log(
-            "Valid combined placement found after attempts:",
-            attempt
-        );
-
-        return withArrow;
-    }
-
-    return null;
-}
 
 
-function addAllCurrentMechanicsToCandidate(
-    candidate,
-    maxAttempts = 50
-) {
-    if (!candidate) {
-        return null;
-    }
 
-    const sameTile = (a, b) =>
-        a[0] === b[0] &&
-        a[1] === b[1];
 
-    for (
-        let attempt = 1;
-        attempt <= maxAttempts;
-        attempt++
-    ) {
-        const withKey =
-            addKeyGateToCandidate(candidate);
-
-        if (withKey === null) {
-            continue;
-        }
-
-        const withSwitch =
-            addSwitchGateToCandidate(withKey);
-
-        if (withSwitch === null) {
-            continue;
-        }
-
-        const withArrow =
-            addRequiredArrowToCandidate(withSwitch);
-
-        if (withArrow === null) {
-            continue;
-        }
-
-        const keyPosition =
-            withArrow.keys[0].position;
-
-        const keyGatePosition =
-            withArrow.lockGroups[0].tiles[0];
-
-        const switchPosition =
-            withArrow.switches[0].position;
-
-        const switchGatePosition =
-            withArrow.switchGates[0].tiles[0];
-
-        const arrowPosition =
-            withArrow.requiredArrows[0].position;
-
-        const mechanicPositions = [
-            keyPosition,
-            keyGatePosition,
-            switchPosition,
-            switchGatePosition,
-            arrowPosition
-        ];
-
-        let hasConflict = false;
-
-        for (
-            let i = 0;
-            i < mechanicPositions.length;
-            i++
-        ) {
-            for (
-                let j = i + 1;
-                j < mechanicPositions.length;
-                j++
-            ) {
-                if (
-                    sameTile(
-                        mechanicPositions[i],
-                        mechanicPositions[j]
-                    )
-                ) {
-                    hasConflict = true;
-                }
-            }
-        }
-
-        if (hasConflict) {
-            continue;
-        }
-
-        const normalized =
-            normalizeLevel(withArrow);
-
-        const optimal =
-            findShortestPathLength(normalized);
-
-        if (
-            optimal === null ||
-            optimal !== withArrow.path.length - 1
-        ) {
-            continue;
-        }
-
-        console.log(
-            "Valid all-mechanics placement found after attempts:",
-            attempt
-        );
-
-        return withArrow;
-    }
-
-    return null;
-}
 
 function addTwoSwitchesToCandidate(
     candidate,
@@ -1559,6 +1374,171 @@ function validateRequiredKeyGroups(candidate) {
 
     return true;
 }
+
+
+
+
+function addMechanicsToCandidate(
+    candidate,
+    options = {},
+    maxAttempts = 50
+) {
+    if (!candidate || !candidate.path) {
+        return null;
+    }
+
+    const {
+        keys = 0,
+        switches = 0,
+        arrows = 0
+    } = options;
+
+    const sameTile = (a, b) =>
+        a[0] === b[0] &&
+        a[1] === b[1];
+
+    for (
+        let attempt = 1;
+        attempt <= maxAttempts;
+        attempt++
+    ) {
+        let updated =
+            structuredClone(candidate);
+
+        if (keys === 1) {
+            updated =
+                addKeyGateToCandidate(updated);
+        } else if (keys === 2) {
+            updated =
+                addTwoKeysToCandidate(updated);
+        }
+
+        if (!updated) {
+            continue;
+        }
+
+        if (switches === 1) {
+            updated =
+                addSwitchGateToCandidate(updated);
+        } else if (switches === 2) {
+            updated =
+                addTwoSwitchesToCandidate(updated);
+        }
+
+        if (!updated) {
+            continue;
+        }
+
+        for (
+            let i = 0;
+            i < arrows;
+            i++
+        ) {
+            updated =
+                addRequiredArrowToCandidate(updated);
+
+            if (!updated) {
+                break;
+            }
+        }
+
+        if (!updated) {
+            continue;
+        }
+
+        const occupiedPositions = [];
+
+        if (updated.keys) {
+            occupiedPositions.push(
+                ...updated.keys.map(
+                    key => key.position
+                )
+            );
+        }
+
+        if (updated.lockGroups) {
+            occupiedPositions.push(
+                ...updated.lockGroups.flatMap(
+                    group => group.tiles
+                )
+            );
+        }
+
+        if (updated.switches) {
+            occupiedPositions.push(
+                ...updated.switches.map(
+                    sw => sw.position
+                )
+            );
+        }
+
+        if (updated.switchGates) {
+            occupiedPositions.push(
+                ...updated.switchGates.flatMap(
+                    group => group.tiles
+                )
+            );
+        }
+
+        if (updated.requiredArrows) {
+            occupiedPositions.push(
+                ...updated.requiredArrows.map(
+                    arrow => arrow.position
+                )
+            );
+        }
+
+        let hasConflict = false;
+
+        for (
+            let i = 0;
+            i < occupiedPositions.length;
+            i++
+        ) {
+            for (
+                let j = i + 1;
+                j < occupiedPositions.length;
+                j++
+            ) {
+                if (
+                    sameTile(
+                        occupiedPositions[i],
+                        occupiedPositions[j]
+                    )
+                ) {
+                    hasConflict = true;
+                }
+            }
+        }
+
+        if (hasConflict) {
+            continue;
+        }
+
+        const normalized =
+            normalizeLevel(updated);
+
+        const optimal =
+            findShortestPathLength(normalized);
+
+        if (
+            optimal === null ||
+            optimal !== updated.path.length - 1
+        ) {
+            continue;
+        }
+
+        console.log(
+            "Valid mixed mechanic placement found after attempts:",
+            attempt
+        );
+
+        return updated;
+    }
+
+    return null;
+}
+
 
 
 //testing section
