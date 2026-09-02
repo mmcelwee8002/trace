@@ -787,6 +787,149 @@ function testTwoSwitchRequirement() {
     }
 }
 
+function testTwoKeyCandidate() {
+    const candidate =
+        createPathBasedCandidate(24);
+
+    const withTwoKeys =
+        addTwoKeysToCandidate(candidate);
+
+    if (!withTwoKeys) {
+        console.log("Two-key candidate: failed");
+        return;
+    }
+
+    const normalized =
+        normalizeLevel(withTwoKeys);
+
+    const optimal =
+        findShortestPathLength(normalized);
+
+    console.log(
+        "Two-key target:",
+        withTwoKeys.targetLength
+    );
+
+    console.log(
+        "Two-key planned:",
+        withTwoKeys.path.length - 1
+    );
+
+    console.log(
+        "Two-key optimal:",
+        optimal
+    );
+
+    console.log(
+        "Two-key keys:",
+        withTwoKeys.keys
+    );
+
+    console.log(
+        "Two-key gates:",
+        withTwoKeys.lockGroups
+    );
+}
+
+function testTwoKeyRequirement() {
+    const candidate =
+        createPathBasedCandidate(24);
+
+    const withTwoKeys =
+        addTwoKeysToCandidate(candidate);
+
+    if (!withTwoKeys) {
+        console.log("Two-key requirement test: failed to create candidate");
+        return;
+    }
+
+    for (let i = 0; i < withTwoKeys.keys.length; i++) {
+        const broken =
+            structuredClone(withTwoKeys);
+
+        const key =
+            broken.keys[i];
+
+        const gateGroup =
+            broken.lockGroups.find(
+                group => group.keyId === key.id
+            );
+
+        if (!gateGroup) {
+            console.log(
+                `Two-key requirement ${key.id}: no matching gate`
+            );
+            continue;
+        }
+
+        const gatePosition =
+            gateGroup.tiles[0];
+
+        const gateIndex =
+            broken.path.findIndex(
+                ([row, col]) =>
+                    row === gatePosition[0] &&
+                    col === gatePosition[1]
+            );
+
+        if (gateIndex === -1) {
+            console.log(
+                `Two-key requirement ${key.id}: gate not on path`
+            );
+            continue;
+        }
+
+        const otherKeyPositions =
+            broken.keys
+                .filter((_, index) => index !== i)
+                .map(otherKey => otherKey.position);
+
+        let lateKeyPosition = null;
+
+        for (
+            let pathIndex = gateIndex + 1;
+            pathIndex < broken.path.length - 1;
+            pathIndex++
+        ) {
+            const position =
+                broken.path[pathIndex];
+
+            const conflicts =
+                otherKeyPositions.some(
+                    other =>
+                        other[0] === position[0] &&
+                        other[1] === position[1]
+                );
+
+            if (!conflicts) {
+                lateKeyPosition = position;
+                break;
+            }
+        }
+
+        if (!lateKeyPosition) {
+            console.log(
+                `Two-key requirement ${key.id}: no valid late position`
+            );
+            continue;
+        }
+
+        broken.keys[i].position =
+            lateKeyPosition;
+
+        const normalized =
+            normalizeLevel(broken);
+
+        const optimal =
+            findShortestPathLength(normalized);
+
+        console.log(
+            `Two-key requirement ${key.id}:`,
+            optimal
+        );
+    }
+}
+
 
 
 //testPathCandidate();
@@ -807,3 +950,5 @@ testRequiredKeyValidation();
 testAllCurrentMechanicsCandidate();
 testTwoSwitchCandidate();
 testTwoSwitchRequirement();
+testTwoKeyCandidate();
+testTwoKeyRequirement();

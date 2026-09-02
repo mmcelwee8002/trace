@@ -558,17 +558,17 @@ function addRequiredArrowToCandidate(candidate) {
         structuredClone(candidate);
 
     updated.requiredArrows = [
-    {
-        position: current,
-        direction
+        {
+            position: current,
+            direction
+        }
+    ];
+
+    if (!validateRequiredArrow(updated)) {
+        return null;
     }
-];
 
-if (!validateRequiredArrow(updated)) {
-    return null;
-}
-
-return updated;
+    return updated;
 }
 
 
@@ -718,15 +718,15 @@ function addKeyGateToCandidate(
         ];
 
         if (!validateRequiredKey(updated)) {
-    continue;
-}
+            continue;
+        }
 
-console.log(
-    "Valid key placement found after attempts:",
-    attempt
-);
+        console.log(
+            "Valid key placement found after attempts:",
+            attempt
+        );
 
-return updated;
+        return updated;
     }
 
     return null;
@@ -1161,6 +1161,10 @@ function addTwoSwitchesToCandidate(
             continue;
         }
 
+        if (!validateRequiredSwitchGroups(updated)) {
+            continue;
+        }
+
         console.log(
             "Valid two-switch placement found after attempts:",
             attempt
@@ -1173,8 +1177,388 @@ function addTwoSwitchesToCandidate(
 }
 
 
+function addTwoKeysToCandidate(
+    candidate,
+    maxAttempts = 50
+) {
+    if (!candidate || !candidate.path) {
+        return null;
+    }
+
+    const path = candidate.path;
+
+    if (path.length < 16) {
+        return null;
+    }
+
+    const sameTile = (a, b) =>
+        a[0] === b[0] &&
+        a[1] === b[1];
+
+    for (
+        let attempt = 1;
+        attempt <= maxAttempts;
+        attempt++
+    ) {
+        const updated =
+            structuredClone(candidate);
+
+        const k1Index =
+            2 +
+            Math.floor(
+                Math.random() *
+                Math.max(
+                    1,
+                    Math.floor(path.length * 0.25) - 1
+                )
+            );
+
+        const g1Min =
+            k1Index + 3;
+
+        const g1Max =
+            Math.floor(path.length * 0.5);
+
+        if (g1Min > g1Max) {
+            continue;
+        }
+
+        const g1Index =
+            g1Min +
+            Math.floor(
+                Math.random() *
+                (g1Max - g1Min + 1)
+            );
+
+        const k2Min =
+            g1Index + 2;
+
+        const k2Max =
+            Math.floor(path.length * 0.7);
+
+        if (k2Min > k2Max) {
+            continue;
+        }
+
+        const k2Index =
+            k2Min +
+            Math.floor(
+                Math.random() *
+                (k2Max - k2Min + 1)
+            );
+
+        const g2Min =
+            k2Index + 3;
+
+        const g2Max =
+            path.length - 2;
+
+        if (g2Min > g2Max) {
+            continue;
+        }
+
+        const g2Index =
+            g2Min +
+            Math.floor(
+                Math.random() *
+                (g2Max - g2Min + 1)
+            );
+
+        const k1Position =
+            path[k1Index];
+
+        const g1Position =
+            path[g1Index];
+
+        const k2Position =
+            path[k2Index];
+
+        const g2Position =
+            path[g2Index];
+
+        const positions = [
+            k1Position,
+            g1Position,
+            k2Position,
+            g2Position
+        ];
+
+        let hasConflict = false;
+
+        for (
+            let i = 0;
+            i < positions.length;
+            i++
+        ) {
+            for (
+                let j = i + 1;
+                j < positions.length;
+                j++
+            ) {
+                if (
+                    sameTile(
+                        positions[i],
+                        positions[j]
+                    )
+                ) {
+                    hasConflict = true;
+                }
+            }
+        }
+
+        if (hasConflict) {
+            continue;
+        }
+
+        updated.keys = [
+            {
+                id: "A",
+                position: k1Position
+            },
+            {
+                id: "B",
+                position: k2Position
+            }
+        ];
+
+        updated.lockGroups = [
+            {
+                keyId: "A",
+                tiles: [
+                    g1Position
+                ]
+            },
+            {
+                keyId: "B",
+                tiles: [
+                    g2Position
+                ]
+            }
+        ];
+
+        const normalized =
+            normalizeLevel(updated);
+
+        const optimal =
+            findShortestPathLength(normalized);
+
+        if (
+            optimal === null ||
+            optimal !== path.length - 1
+        ) {
+            continue;
+        }
+        if (!validateRequiredKeyGroups(updated)) {
+            continue;
+        }
 
 
+        console.log(
+            "Valid two-key placement found after attempts:",
+            attempt
+        );
+
+        return updated;
+    }
+
+    return null;
+}
+
+function validateRequiredSwitchGroups(candidate) {
+    if (
+        !candidate ||
+        !candidate.path ||
+        !candidate.switches ||
+        !candidate.switchGates ||
+        candidate.switches.length < 2 ||
+        candidate.switchGates.length < 2
+    ) {
+        return false;
+    }
+
+    const normalized =
+        normalizeLevel(candidate);
+
+    const normalOptimal =
+        findShortestPathLength(normalized);
+
+    if (normalOptimal === null) {
+        return false;
+    }
+
+    const path = candidate.path;
+
+    for (let i = 0; i < candidate.switches.length; i++) {
+        const brokenCandidate =
+            structuredClone(candidate);
+
+        const gatePosition =
+            brokenCandidate.switchGates[i].tiles[0];
+
+        const gateIndex =
+            path.findIndex(
+                ([row, col]) =>
+                    row === gatePosition[0] &&
+                    col === gatePosition[1]
+            );
+
+        if (gateIndex === -1) {
+            return false;
+        }
+
+        const otherSwitchPositions =
+            brokenCandidate.switches
+                .filter((_, index) => index !== i)
+                .map(sw => sw.position);
+
+        let lateSwitchPosition = null;
+
+        for (
+            let pathIndex = gateIndex + 1;
+            pathIndex < path.length - 1;
+            pathIndex++
+        ) {
+            const position =
+                path[pathIndex];
+
+            const conflicts =
+                otherSwitchPositions.some(
+                    other =>
+                        other[0] === position[0] &&
+                        other[1] === position[1]
+                );
+
+            if (!conflicts) {
+                lateSwitchPosition = position;
+                break;
+            }
+        }
+
+        if (lateSwitchPosition === null) {
+            return false;
+        }
+
+        brokenCandidate.switches[i].position =
+            lateSwitchPosition;
+
+        const brokenNormalized =
+            normalizeLevel(brokenCandidate);
+
+        const brokenOptimal =
+            findShortestPathLength(
+                brokenNormalized
+            );
+
+        if (brokenOptimal !== null) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+function validateRequiredKeyGroups(candidate) {
+    if (
+        !candidate ||
+        !candidate.path ||
+        !candidate.keys ||
+        !candidate.lockGroups ||
+        candidate.keys.length < 2 ||
+        candidate.lockGroups.length < 2
+    ) {
+        return false;
+    }
+
+    const normalized =
+        normalizeLevel(candidate);
+
+    const normalOptimal =
+        findShortestPathLength(normalized);
+
+    if (normalOptimal === null) {
+        return false;
+    }
+
+    for (let i = 0; i < candidate.keys.length; i++) {
+        const broken =
+            structuredClone(candidate);
+
+        const key =
+            broken.keys[i];
+
+        const gateGroup =
+            broken.lockGroups.find(
+                group => group.keyId === key.id
+            );
+
+        if (!gateGroup) {
+            return false;
+        }
+
+        const gatePosition =
+            gateGroup.tiles[0];
+
+        const gateIndex =
+            broken.path.findIndex(
+                ([row, col]) =>
+                    row === gatePosition[0] &&
+                    col === gatePosition[1]
+            );
+
+        if (gateIndex === -1) {
+            return false;
+        }
+
+        const otherKeyPositions =
+            broken.keys
+                .filter((_, index) => index !== i)
+                .map(otherKey => otherKey.position);
+
+        let lateKeyPosition = null;
+
+        for (
+            let pathIndex = gateIndex + 1;
+            pathIndex < broken.path.length - 1;
+            pathIndex++
+        ) {
+            const position =
+                broken.path[pathIndex];
+
+            const conflicts =
+                otherKeyPositions.some(
+                    other =>
+                        other[0] === position[0] &&
+                        other[1] === position[1]
+                );
+
+            if (!conflicts) {
+                lateKeyPosition = position;
+                break;
+            }
+        }
+
+        if (!lateKeyPosition) {
+            return false;
+        }
+
+        broken.keys[i].position =
+            lateKeyPosition;
+
+        const brokenNormalized =
+            normalizeLevel(broken);
+
+        const brokenOptimal =
+            findShortestPathLength(
+                brokenNormalized
+            );
+
+        if (brokenOptimal !== null) {
+            return false;
+        }
+    }
+
+    return true;
+}
 
 
-
+//testing section
