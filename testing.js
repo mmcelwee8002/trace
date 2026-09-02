@@ -911,6 +911,47 @@ function testMixedMechanicRequirements() {
     );
 }
 
+function testDifficultyCandidate() {
+    const difficulty = "medium";
+    const candidate =
+        createCandidateForDifficulty(difficulty);
+
+    if (!candidate) {
+        console.log(
+            "Difficulty candidate: failed"
+        );
+        return;
+    }
+
+    const profile = difficultyProfiles[difficulty];
+    const normalized = normalizeLevel(candidate);
+    const optimal =
+        findShortestPathLength(normalized);
+
+    console.log("Difficulty:", difficulty);
+    console.log(
+        "Target length:",
+        profile.targetLength
+    );
+    console.log(
+        "Planned length:",
+        candidate.path.length - 1
+    );
+    console.log("Optimal:", optimal);
+    console.log(
+        "Number of keys:",
+        candidate.keys.length
+    );
+    console.log(
+        "Number of switches:",
+        candidate.switches.length
+    );
+    console.log(
+        "Number of required arrows:",
+        candidate.requiredArrows.length
+    );
+}
+
 
 
 
@@ -940,3 +981,4 @@ testTwoKeyRequirement();
 
 testMixedMechanicCandidate();
 testMixedMechanicRequirements();
+testDifficultyCandidate();

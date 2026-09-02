@@ -2,6 +2,33 @@
 
 const generatedFingerprints = new Set();
 
+const difficultyProfiles = {
+    easy: {
+        targetLength: 20,
+        keys: 0,
+        switches: 1,
+        arrows: 0
+    },
+    medium: {
+        targetLength: 28,
+        keys: 1,
+        switches: 1,
+        arrows: 1
+    },
+    hard: {
+        targetLength: 36,
+        keys: 2,
+        switches: 1,
+        arrows: 1
+    },
+    extreme: {
+        targetLength: 44,
+        keys: 2,
+        switches: 2,
+        arrows: 1
+    }
+};
+
 function getNeighbors(row, col, size) {
     const neighbors = [
         [row - 1, col],
@@ -1528,6 +1555,66 @@ function addMechanicsToCandidate(
     }
 
     return null;
+}
+
+function createCandidateForDifficulty(difficulty) {
+    if (!Object.hasOwn(difficultyProfiles, difficulty)) {
+        return null;
+    }
+
+    const profile = difficultyProfiles[difficulty];
+    const candidate =
+        createUniquePathCandidate(profile.targetLength);
+
+    if (!candidate) {
+        return null;
+    }
+
+    const completedCandidate =
+        addMechanicsToCandidate(candidate, {
+            keys: profile.keys,
+            switches: profile.switches,
+            arrows: profile.arrows
+        });
+
+    if (!completedCandidate) {
+        return null;
+    }
+
+    const normalized =
+        normalizeLevel(completedCandidate);
+    const optimal =
+        findShortestPathLength(normalized);
+
+    if (
+        optimal === null ||
+        optimal !== completedCandidate.path.length - 1
+    ) {
+        return null;
+    }
+
+    if (
+        profile.keys === 2 &&
+        !validateRequiredKeyGroups(completedCandidate)
+    ) {
+        return null;
+    }
+
+    if (
+        profile.switches === 2 &&
+        !validateRequiredSwitchGroups(completedCandidate)
+    ) {
+        return null;
+    }
+
+    if (
+        profile.arrows > 0 &&
+        !validateRequiredArrow(completedCandidate)
+    ) {
+        return null;
+    }
+
+    return completedCandidate;
 }
 
 
