@@ -798,12 +798,6 @@ function validateRequiredKey(candidate) {
     return brokenOptimal === null;
 }
 
-
-
-
-
-
-
 function addTwoSwitchesToCandidate(
     candidate,
     maxAttempts = 50
@@ -1375,9 +1369,6 @@ function validateRequiredKeyGroups(candidate) {
     return true;
 }
 
-
-
-
 function addMechanicsToCandidate(
     candidate,
     options = {},
@@ -1541,4 +1532,3 @@ function addMechanicsToCandidate(
 
 
 
-//testing section

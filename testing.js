@@ -806,16 +806,6 @@ function testTwoKeyRequirement() {
     }
 }
 
-
-
-
-
-
-
-
-
-
-
 function testMixedMechanicCandidate() {
     const candidate =
         createPathBasedCandidate(24);
