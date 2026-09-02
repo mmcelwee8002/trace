@@ -912,7 +912,7 @@ function testMixedMechanicRequirements() {
 }
 
 function testDifficultyCandidate() {
-    const difficulty = "medium";
+    const difficulty = "extreme";
     const candidate =
         createCandidateForDifficulty(difficulty);
 
@@ -952,7 +952,90 @@ function testDifficultyCandidate() {
     );
 }
 
+function testDifficultyBatch(
+    difficulty,
+    count = 25
+) {
+    let success = 0;
+    let fail = 0;
+    let optimalMismatch = 0;
+    let totalSearchWork = 0;
+    let maxSearchWork = 0;
 
+    for (let i = 0; i < count; i++) {
+        const candidate =
+            createCandidateForDifficulty(
+                difficulty
+            );
+
+        if (!candidate) {
+            fail++;
+            continue;
+        }
+
+        success++;
+
+        const normalized =
+            normalizeLevel(candidate);
+
+        const optimal =
+            findShortestPathLength(
+                normalized
+            );
+
+        const planned =
+            candidate.path.length - 1;
+
+        if (optimal !== planned) {
+            optimalMismatch++;
+        }
+
+        const searchWork =
+            createDynamicPath.lastSearchWork || 0;
+
+        totalSearchWork +=
+            searchWork;
+
+        if (
+            searchWork >
+            maxSearchWork
+        ) {
+            maxSearchWork =
+                searchWork;
+        }
+    }
+
+    console.log(
+        `Batch ${difficulty}:`
+    );
+
+    console.log(
+        "Success:",
+        success
+    );
+
+    console.log(
+        "Fail:",
+        fail
+    );
+
+    console.log(
+        "Optimal mismatch:",
+        optimalMismatch
+    );
+
+    console.log(
+        "Average search work:",
+        success > 0
+            ? totalSearchWork / success
+            : 0
+    );
+
+    console.log(
+        "Max search work:",
+        maxSearchWork
+    );
+}
 
 
 //testPathCandidate();
@@ -966,19 +1049,16 @@ testRequiredSwitchValidation();
 testRequiredArrowCandidate();
 testRequiredArrowRequirement();
 testRequiredArrowValidation();
-
 testKeyGateCandidate();
 testKeyRequirement();
 testRequiredKeyValidation();
-
 testTwoSwitchCandidate();
-
-
 testTwoKeyRequirement();
-
-
-
-
 testMixedMechanicCandidate();
 testMixedMechanicRequirements();
 testDifficultyCandidate();
+
+testDifficultyBatch(
+    "extreme",
+    25
+);
