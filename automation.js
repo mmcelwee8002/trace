@@ -22,7 +22,6 @@ const difficultyProfiles = {
         branchCount: 2,
         maxBranchLength: 3,
         openFraction: 0.20,
-        targetOpenness: 0.50,
         minOpenRegionSize: 2,
         maxOpenRegionSize: 4
     },
@@ -34,7 +33,6 @@ const difficultyProfiles = {
         branchCount: 3,
         maxBranchLength: 4,
         openFraction: 0.35,
-        targetOpenness: 0.65,
         minOpenRegionSize: 3,
         maxOpenRegionSize: 6
     },
@@ -46,7 +44,6 @@ const difficultyProfiles = {
         branchCount: 4,
         maxBranchLength: 5,
         openFraction: 0.50,
-        targetOpenness: 0.75,
         minOpenRegionSize: 4,
         maxOpenRegionSize: 8
     }
@@ -1609,39 +1606,24 @@ function createCandidateForDifficulty(difficulty) {
         return null;
     }
 
-    const useAggressiveOpenSpace =
-        difficulty === "hard" || difficulty === "extreme";
-
-    completedCandidate = useAggressiveOpenSpace
-        ? createOpenCandidateSpace(
-            completedCandidate,
-            {
-                targetOpenness: profile.targetOpenness,
-                difficulty
-            }
-        )
-        : openCandidateSpace(
-            completedCandidate,
-            {
-                openFraction: profile.openFraction,
-                minOpenRegionSize: profile.minOpenRegionSize,
-                maxOpenRegionSize: profile.maxOpenRegionSize,
-                difficulty
-            }
-        );
+    completedCandidate = openCandidateSpace(
+        completedCandidate,
+        {
+            openFraction: profile.openFraction,
+            minOpenRegionSize: profile.minOpenRegionSize,
+            maxOpenRegionSize: profile.maxOpenRegionSize,
+            difficulty
+        }
+    );
 
     if (!completedCandidate) {
         createCandidateForDifficulty.lastFailureReason =
-            (useAggressiveOpenSpace
-                ? createOpenCandidateSpace.lastFailureReason
-                : openCandidateSpace.lastFailureReason) ||
+            openCandidateSpace.lastFailureReason ||
             "open-space";
         logOpenSpaceRejection(
             difficulty,
             createCandidateForDifficulty.lastFailureReason,
-            useAggressiveOpenSpace
-                ? createOpenCandidateSpace.lastDiagnostics
-                : openCandidateSpace.lastDiagnostics
+            openCandidateSpace.lastDiagnostics
         );
         return null;
     }
@@ -2092,6 +2074,9 @@ function openCandidateSpace(
     return result;
 }
 
+// Disabled: experimental aggressive open-space strategy retained only
+// for reference while the conservative opener remains active.
+if (false) {
 function createOpenCandidateSpace(
     candidate,
     options = {}
@@ -2362,6 +2347,7 @@ function createOpenCandidateSpace(
     }
 
     return result;
+}
 }
 
 function addBranchesToCandidate(
