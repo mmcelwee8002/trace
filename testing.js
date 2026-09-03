@@ -1037,6 +1037,244 @@ function testDifficultyBatch(
     );
 }
 
+function testCampaignCandidateSelection() {
+    const selected = selectBestCandidates(
+        "medium",
+        10,
+        25
+    );
+
+    console.log(
+        "Total selected:",
+        selected.length
+    );
+
+    selected.forEach((item, index) => {
+        const quality = item.quality;
+
+        console.log(
+            `#${index + 1} | ` +
+            `score ${quality.score} | ` +
+            `target ${quality.targetLength} | ` +
+            `mechanics ${quality.mechanicCount} | ` +
+            `spacing ${quality.mechanicSpacing} | ` +
+            `coverage ${quality.pathCoverage}`
+        );
+    });
+}
+
+function testBranchCandidate() {
+    const candidate =
+        createCandidateForDifficulty("medium");
+
+    if (!candidate) {
+        console.log("Branch candidate: generation failed");
+        return;
+    }
+
+    const requestedBranchCount = 2;
+    const qualityBefore =
+        scoreCandidateQuality(candidate);
+    const branched = addBranchesToCandidate(candidate, {
+        branchCount: requestedBranchCount,
+        maxBranchLength: 3
+    });
+
+    if (!branched) {
+        console.log("Branch candidate: branching failed");
+        return;
+    }
+
+    const optimal = findShortestPathLength(
+        normalizeLevel(branched)
+    );
+    const qualityAfter =
+        scoreCandidateQuality(branched);
+
+    console.log("Branch candidate:");
+    console.log(
+        "Planned length:",
+        branched.path.length - 1
+    );
+    console.log("Optimal:", optimal);
+    console.log(
+        "Requested branch count:",
+        requestedBranchCount
+    );
+    console.log(
+        "Actual branch count:",
+        qualityAfter.branchCount
+    );
+    console.log(
+        "Total branch tiles:",
+        qualityAfter.branchTileCount
+    );
+    console.log(
+        "Branch coordinates:",
+        branched.branches
+    );
+    console.log(
+        "Quality before branches:",
+        qualityBefore.score
+    );
+    console.log(
+        "Quality after branches:",
+        qualityAfter.score
+    );
+}
+
+function testBranchBatch() {
+    const count = 25;
+    let success = 0;
+    let fail = 0;
+    let optimalMismatches = 0;
+    let fullBranchCount = 0;
+    let partialBranchCount = 0;
+    let zeroBranchCount = 0;
+    let totalBranchTiles = 0;
+    let maxBranchTileCount = 0;
+
+    for (let index = 0; index < count; index++) {
+        const candidate =
+            createCandidateForDifficulty("medium");
+
+        if (!candidate) {
+            fail++;
+            continue;
+        }
+
+        const branched = addBranchesToCandidate(candidate, {
+            branchCount: 2,
+            maxBranchLength: 3
+        });
+
+        if (!branched) {
+            fail++;
+            continue;
+        }
+
+        success++;
+
+        const optimal = findShortestPathLength(
+            normalizeLevel(branched)
+        );
+        const plannedLength = branched.path.length - 1;
+
+        if (optimal !== plannedLength) {
+            optimalMismatches++;
+        }
+
+        const actualBranchCount =
+            branched.branches?.length ?? 0;
+        const branchTileCount =
+            (branched.branches ?? []).reduce(
+                (total, branch) => total + branch.length,
+                0
+            );
+
+        if (actualBranchCount === 2) {
+            fullBranchCount++;
+        } else if (actualBranchCount === 1) {
+            partialBranchCount++;
+        } else if (actualBranchCount === 0) {
+            zeroBranchCount++;
+        }
+
+        totalBranchTiles += branchTileCount;
+        maxBranchTileCount = Math.max(
+            maxBranchTileCount,
+            branchTileCount
+        );
+    }
+
+    console.log("Branch batch:", {
+        success,
+        fail,
+        optimalMismatches,
+        fullBranchCount,
+        partialBranchCount,
+        zeroBranchCount,
+        averageBranchTileCount: success > 0
+            ? Number((totalBranchTiles / success).toFixed(2))
+            : 0,
+        maxBranchTileCount
+    });
+}
+
+function testAllDifficultyBranchBatch() {
+    const difficulties = [
+        "easy",
+        "medium",
+        "hard",
+        "extreme"
+    ];
+    const count = 25;
+
+    difficulties.forEach(difficulty => {
+        const profile = difficultyProfiles[difficulty];
+        let success = 0;
+        let fail = 0;
+        let optimalMismatches = 0;
+        let totalBranches = 0;
+        let totalBranchTiles = 0;
+        let maxBranchTileCount = 0;
+
+        for (let index = 0; index < count; index++) {
+            const candidate =
+                createCandidateForDifficulty(difficulty);
+
+            if (!candidate) {
+                fail++;
+                continue;
+            }
+
+            success++;
+
+            const optimal = findShortestPathLength(
+                normalizeLevel(candidate)
+            );
+            const plannedLength =
+                candidate.path.length - 1;
+
+            if (optimal !== plannedLength) {
+                optimalMismatches++;
+            }
+
+            const actualBranchCount =
+                candidate.branches?.length ?? 0;
+            const branchTileCount =
+                (candidate.branches ?? []).reduce(
+                    (total, branch) =>
+                        total + branch.length,
+                    0
+                );
+
+            totalBranches += actualBranchCount;
+            totalBranchTiles += branchTileCount;
+            maxBranchTileCount = Math.max(
+                maxBranchTileCount,
+                branchTileCount
+            );
+        }
+
+        console.log(`Branch batch ${difficulty}:`, {
+            requestedBranchCount: profile.branchCount,
+            success,
+            fail,
+            optimalMismatches,
+            averageActualBranchCount: success > 0
+                ? Number((totalBranches / success).toFixed(2))
+                : 0,
+            averageBranchTileCount: success > 0
+                ? Number(
+                    (totalBranchTiles / success).toFixed(2)
+                )
+                : 0,
+            maxBranchTileCount
+        });
+    });
+}
+
 
 //testPathCandidate();
 //testDynamicPath();
@@ -1062,3 +1300,8 @@ testDifficultyBatch(
     "extreme",
     25
 );
+
+testCampaignCandidateSelection();
+testBranchCandidate();
+testBranchBatch();
+testAllDifficultyBranchBatch();

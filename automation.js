@@ -7,25 +7,33 @@ const difficultyProfiles = {
         targetLength: 20,
         keys: 0,
         switches: 1,
-        arrows: 0
+        arrows: 0,
+        branchCount: 0,
+        maxBranchLength: 0
     },
     medium: {
         targetLength: 28,
         keys: 1,
         switches: 1,
-        arrows: 1
+        arrows: 1,
+        branchCount: 2,
+        maxBranchLength: 3
     },
     hard: {
         targetLength: 36,
         keys: 2,
         switches: 1,
-        arrows: 1
+        arrows: 1,
+        branchCount: 3,
+        maxBranchLength: 4
     },
     extreme: {
         targetLength: 44,
         keys: 2,
         switches: 2,
-        arrows: 1
+        arrows: 1,
+        branchCount: 4,
+        maxBranchLength: 5
     }
 };
 
@@ -1570,7 +1578,7 @@ function createCandidateForDifficulty(difficulty) {
         return null;
     }
 
-    const completedCandidate =
+    let completedCandidate =
         addMechanicsToCandidate(candidate, {
             keys: profile.keys,
             switches: profile.switches,
@@ -1579,6 +1587,20 @@ function createCandidateForDifficulty(difficulty) {
 
     if (!completedCandidate) {
         return null;
+    }
+
+    if (profile.branchCount > 0) {
+        completedCandidate = addBranchesToCandidate(
+            completedCandidate,
+            {
+                branchCount: profile.branchCount,
+                maxBranchLength: profile.maxBranchLength
+            }
+        );
+
+        if (!completedCandidate) {
+            return null;
+        }
     }
 
     const normalized =
@@ -1615,6 +1637,415 @@ function createCandidateForDifficulty(difficulty) {
     }
 
     return completedCandidate;
+}
+
+function addBranchesToCandidate(
+    candidate,
+    options = {}
+) {
+    if (!candidate?.path || !candidate?.walls) {
+        return null;
+    }
+
+    const {
+        branchCount = 2,
+        maxBranchLength = 3,
+        maxAttempts = 100
+    } = options;
+
+    if (
+        !Number.isInteger(branchCount) ||
+        !Number.isInteger(maxBranchLength) ||
+        !Number.isInteger(maxAttempts) ||
+        branchCount < 0 ||
+        maxBranchLength < 1 ||
+        maxAttempts < 1
+    ) {
+        return null;
+    }
+
+    const updated = structuredClone(candidate);
+    updated.branches = updated.branches ?? [];
+
+    const coordinateKey = ([row, col]) =>
+        `${row},${col}`;
+    const sameTile = (a, b) =>
+        a[0] === b[0] && a[1] === b[1];
+    const shuffle = values => {
+        for (
+            let index = values.length - 1;
+            index > 0;
+            index--
+        ) {
+            const randomIndex = Math.floor(
+                Math.random() * (index + 1)
+            );
+
+            [values[index], values[randomIndex]] =
+                [values[randomIndex], values[index]];
+        }
+
+        return values;
+    };
+
+    const pathKeys = new Set(
+        updated.path.map(coordinateKey)
+    );
+    const mechanicPositions = [
+        ...(updated.keys ?? []).map(
+            key => key.position
+        ),
+        ...(updated.lockGroups ?? []).flatMap(
+            group => group.tiles
+        ),
+        ...(updated.switches ?? []).map(
+            item => item.position
+        ),
+        ...(updated.switchGates ?? []).flatMap(
+            group => group.tiles
+        ),
+        ...(updated.requiredArrows ?? []).map(
+            arrow => arrow.position
+        )
+    ];
+    const mechanicKeys = new Set(
+        mechanicPositions.map(coordinateKey)
+    );
+    const existingBranchKeys = new Set(
+        updated.branches.flatMap(branch =>
+            branch.map(coordinateKey)
+        )
+    );
+
+    const plannedLength = updated.path.length - 1;
+    let addedBranches = 0;
+
+    for (
+        let attempt = 0;
+        attempt < maxAttempts &&
+        addedBranches < branchCount;
+        attempt++
+    ) {
+        if (updated.path.length < 5) {
+            break;
+        }
+
+        const rootIndex = 2 + Math.floor(
+            Math.random() * (updated.path.length - 4)
+        );
+        const root = updated.path[rootIndex];
+        const desiredLength = 1 + Math.floor(
+            Math.random() * maxBranchLength
+        );
+        const wallKeys = new Set(
+            updated.walls.map(coordinateKey)
+        );
+        const proposedBranch = [];
+        const proposedKeys = new Set();
+        let previous = root;
+
+        for (
+            let step = 0;
+            step < desiredLength;
+            step++
+        ) {
+            const choices = shuffle(
+                getNeighbors(
+                    previous[0],
+                    previous[1],
+                    updated.size
+                )
+            ).filter(position => {
+                const key = coordinateKey(position);
+
+                if (
+                    !wallKeys.has(key) ||
+                    mechanicKeys.has(key) ||
+                    existingBranchKeys.has(key) ||
+                    proposedKeys.has(key)
+                ) {
+                    return false;
+                }
+
+                const plannedNeighbors = getNeighbors(
+                    position[0],
+                    position[1],
+                    updated.size
+                ).filter(neighbor =>
+                    pathKeys.has(coordinateKey(neighbor))
+                );
+
+                if (
+                    step === 0
+                        ? plannedNeighbors.length !== 1 ||
+                            !sameTile(plannedNeighbors[0], root)
+                        : plannedNeighbors.length !== 0
+                ) {
+                    return false;
+                }
+
+                const existingBranchNeighbors =
+                    getNeighbors(
+                        position[0],
+                        position[1],
+                        updated.size
+                    ).filter(neighbor =>
+                        existingBranchKeys.has(
+                            coordinateKey(neighbor)
+                        )
+                    );
+
+                if (existingBranchNeighbors.length > 0) {
+                    return false;
+                }
+
+                const proposedNeighbors = getNeighbors(
+                    position[0],
+                    position[1],
+                    updated.size
+                ).filter(neighbor =>
+                    proposedKeys.has(coordinateKey(neighbor))
+                );
+
+                return step === 0
+                    ? proposedNeighbors.length === 0
+                    : proposedNeighbors.length === 1 &&
+                        sameTile(proposedNeighbors[0], previous);
+            });
+
+            if (choices.length === 0) {
+                break;
+            }
+
+            const next = choices[0];
+            proposedBranch.push(next);
+            proposedKeys.add(coordinateKey(next));
+            previous = next;
+        }
+
+        if (proposedBranch.length === 0) {
+            continue;
+        }
+
+        const proposedKeySet = new Set(
+            proposedBranch.map(coordinateKey)
+        );
+        const trial = structuredClone(updated);
+        trial.walls = trial.walls.filter(
+            wall => !proposedKeySet.has(coordinateKey(wall))
+        );
+        trial.branches.push(proposedBranch);
+
+        const optimal = findShortestPathLength(
+            normalizeLevel(trial)
+        );
+
+        if (
+            optimal === null ||
+            optimal !== plannedLength
+        ) {
+            continue;
+        }
+
+        updated.walls = trial.walls;
+        updated.branches = trial.branches;
+        proposedBranch.forEach(position =>
+            existingBranchKeys.add(coordinateKey(position))
+        );
+        addedBranches++;
+    }
+
+    const finalOptimal = findShortestPathLength(
+        normalizeLevel(updated)
+    );
+
+    return finalOptimal === plannedLength
+        ? updated
+        : null;
+}
+
+function scoreCandidateQuality(candidate) {
+    const path = candidate?.path ?? [];
+    const boardSize = candidate?.size ?? 0;
+    const targetLength = candidate?.targetLength ?? 0;
+    const keyCount = candidate?.keys?.length ?? 0;
+    const switchCount = candidate?.switches?.length ?? 0;
+    const arrowCount =
+        candidate?.requiredArrows?.length ?? 0;
+    const mechanicCount =
+        keyCount + switchCount + arrowCount;
+    const branchCount = candidate?.branches?.length ?? 0;
+    const branchTileCount =
+        (candidate?.branches ?? []).reduce(
+            (total, branch) => total + branch.length,
+            0
+        );
+    const pathMoves = Math.max(path.length - 1, 0);
+    const boardArea = boardSize * boardSize;
+    const pathCoverage = boardArea > 0
+        ? path.length / boardArea
+        : 0;
+
+    const pathIndexByPosition = new Map(
+        path.map((position, index) => [
+            `${position[0]},${position[1]}`,
+            index
+        ])
+    );
+
+    const mechanicPositions = [
+        ...(candidate?.keys ?? []).map(
+            key => key.position
+        ),
+        ...(candidate?.lockGroups ?? []).flatMap(
+            group => group.tiles
+        ),
+        ...(candidate?.switches ?? []).map(
+            item => item.position
+        ),
+        ...(candidate?.switchGates ?? []).flatMap(
+            group => group.tiles
+        ),
+        ...(candidate?.requiredArrows ?? []).map(
+            arrow => arrow.position
+        )
+    ];
+
+    const mechanicIndexes = [
+        ...new Set(
+            mechanicPositions
+                .map(position =>
+                    pathIndexByPosition.get(
+                        `${position[0]},${position[1]}`
+                    )
+                )
+                .filter(index => index !== undefined)
+        )
+    ].sort((a, b) => a - b);
+
+    const gaps = mechanicIndexes
+        .slice(1)
+        .map((index, gapIndex) =>
+            index - mechanicIndexes[gapIndex]
+        );
+
+    const mechanicSpacing =
+        gaps.length > 0 && pathMoves > 0
+            ? gaps.reduce(
+                (total, gap) => total + gap,
+                0
+            ) / gaps.length / pathMoves
+            : 0;
+
+    const clusterDistance = Math.max(
+        2,
+        Math.floor(pathMoves * 0.1)
+    );
+    const clusteredCount = gaps.filter(
+        gap => gap < clusterDistance
+    ).length;
+    const endpointDistance = Math.max(
+        2,
+        Math.floor(pathMoves * 0.1)
+    );
+    const endpointCount = mechanicIndexes.filter(
+        index =>
+            index < endpointDistance ||
+            pathMoves - index < endpointDistance
+    ).length;
+
+    const score =
+        pathMoves * 0.5 +
+        mechanicCount * 5 +
+        mechanicSpacing * 20 +
+        pathCoverage * 20 -
+        clusteredCount * 4 -
+        endpointCount * 3 +
+        Math.min(
+            branchCount * 1.5 + branchTileCount * 0.5,
+            6
+        );
+
+    return {
+        score: Number(score.toFixed(2)),
+        targetLength,
+        boardSize,
+        keyCount,
+        switchCount,
+        arrowCount,
+        mechanicCount,
+        branchCount,
+        branchTileCount,
+        mechanicSpacing:
+            Number(mechanicSpacing.toFixed(4)),
+        pathCoverage:
+            Number(pathCoverage.toFixed(4))
+    };
+}
+
+function generateCandidateBatch(
+    difficulty,
+    count = 25
+) {
+    if (
+        !Object.hasOwn(difficultyProfiles, difficulty) ||
+        !Number.isInteger(count) ||
+        count <= 0
+    ) {
+        return [];
+    }
+
+    const results = [];
+    const batchFingerprints = new Set();
+    const maxAttempts = Math.max(count * 4, count);
+
+    for (
+        let attempt = 0;
+        attempt < maxAttempts && results.length < count;
+        attempt++
+    ) {
+        const candidate =
+            createCandidateForDifficulty(difficulty);
+
+        if (!candidate) {
+            continue;
+        }
+
+        const fingerprint =
+            createCandidateFingerprint(candidate);
+
+        if (batchFingerprints.has(fingerprint)) {
+            continue;
+        }
+
+        batchFingerprints.add(fingerprint);
+        results.push({
+            candidate,
+            quality: scoreCandidateQuality(candidate)
+        });
+    }
+
+    return results.sort(
+        (a, b) => b.quality.score - a.quality.score
+    );
+}
+
+function selectBestCandidates(
+    difficulty,
+    desiredCount = 10,
+    poolSize = 25
+) {
+    if (
+        !Number.isInteger(desiredCount) ||
+        desiredCount <= 0
+    ) {
+        return [];
+    }
+
+    return generateCandidateBatch(
+        difficulty,
+        poolSize
+    ).slice(0, desiredCount);
 }
 
 
