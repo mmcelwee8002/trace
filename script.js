@@ -609,6 +609,7 @@ let highestUnlockedLevel =
 let attempt = null;
 let isDrawing = false;
 let levelComplete = false;
+let isTemporaryLevelPreview = false;
 let bestMovesByLevel =
     JSON.parse(
         localStorage.getItem("traceBestMoves")
@@ -776,11 +777,15 @@ function createBoard() {
     board.dataset.size = level.size;
     board.dataset.handedness = handedness;
     levelNumber.textContent =
-        `Level ${currentLevelIndex + 1}`;
+        isTemporaryLevelPreview
+            ? "Generated Preview"
+            : `Level ${currentLevelIndex + 1}`;
     levelTitle.textContent = level.title;
     gameMessage.textContent = levelInstructions(level);
 
-    const savedBest = bestMovesByLevel[level.id];
+    const savedBest = isTemporaryLevelPreview
+        ? undefined
+        : bestMovesByLevel[level.id];
     const optimalMoves = findShortestPathLength(level);
 
     if (savedBest !== undefined) {
@@ -1092,6 +1097,12 @@ function completeCurrentLevel() {
     const optimalMoves = findShortestPathLength(level);
     const levelId = level.id;
 
+    if (isTemporaryLevelPreview) {
+        levelMessage.textContent =
+            `Preview Complete! Moves: ${playerMoves} | Optimal: ${optimalMoves}`;
+        return;
+    }
+
     if (
         currentLevelIndex === highestUnlockedLevel &&
         highestUnlockedLevel < normalizedLevels.length - 1
@@ -1153,7 +1164,24 @@ function restartLevel() {
     resetAttempt();
 }
 
+function loadTemporaryLevelPreview(authoredLevel) {
+    if (!authoredLevel) {
+        return null;
+    }
+
+    const normalizedPreview = normalizeLevel(authoredLevel);
+
+    isTemporaryLevelPreview = true;
+    level = normalizedPreview;
+    resetAttempt();
+    createBoard();
+
+    return normalizedPreview;
+}
+
 function loadNextLevel() {
+    isTemporaryLevelPreview = false;
+
     if (currentLevelIndex < highestUnlockedLevel) {
         currentLevelIndex++;
     }
@@ -1168,6 +1196,8 @@ function loadNextLevel() {
 }
 
 function loadPreviousLevel() {
+    isTemporaryLevelPreview = false;
+
     if (currentLevelIndex > 0) {
         currentLevelIndex--;
     }

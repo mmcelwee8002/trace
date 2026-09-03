@@ -1275,6 +1275,111 @@ function testAllDifficultyBranchBatch() {
     });
 }
 
+function testDeadEndBranchBatch() {
+    const difficulty = "medium";
+    const count = 25;
+    const requestedBranches =
+        difficultyProfiles[difficulty].branchCount;
+    let success = 0;
+    let fail = 0;
+    let optimalMismatches = 0;
+    let totalBranches = 0;
+    let totalBranchTiles = 0;
+    let maxBranchLength = 0;
+    let branchesWithTurns = 0;
+    let branchesWithoutTurns = 0;
+
+    for (let index = 0; index < count; index++) {
+        const candidate =
+            createCandidateForDifficulty(difficulty);
+
+        if (!candidate) {
+            fail++;
+            continue;
+        }
+
+        success++;
+
+        const optimal = findShortestPathLength(
+            normalizeLevel(candidate)
+        );
+
+        if (optimal !== candidate.path.length - 1) {
+            optimalMismatches++;
+        }
+
+        const branches = candidate.branches ?? [];
+        totalBranches += branches.length;
+
+        branches.forEach(branch => {
+            totalBranchTiles += branch.length;
+            maxBranchLength = Math.max(
+                maxBranchLength,
+                branch.length
+            );
+
+            const attachment = candidate.path.find(
+                position =>
+                    Math.abs(position[0] - branch[0][0]) +
+                    Math.abs(position[1] - branch[0][1]) === 1
+            );
+            const route = attachment
+                ? [attachment, ...branch]
+                : branch;
+            let hasTurn = false;
+
+            for (
+                let tileIndex = 2;
+                tileIndex < route.length;
+                tileIndex++
+            ) {
+                const firstRowChange =
+                    route[tileIndex - 1][0] -
+                    route[tileIndex - 2][0];
+                const firstColChange =
+                    route[tileIndex - 1][1] -
+                    route[tileIndex - 2][1];
+                const nextRowChange =
+                    route[tileIndex][0] -
+                    route[tileIndex - 1][0];
+                const nextColChange =
+                    route[tileIndex][1] -
+                    route[tileIndex - 1][1];
+
+                if (
+                    firstRowChange !== nextRowChange ||
+                    firstColChange !== nextColChange
+                ) {
+                    hasTurn = true;
+                    break;
+                }
+            }
+
+            if (hasTurn) {
+                branchesWithTurns++;
+            } else {
+                branchesWithoutTurns++;
+            }
+        });
+    }
+
+    console.log("Dead-end branch batch:", {
+        success,
+        fail,
+        optimalMismatches,
+        requestedBranches,
+        averageActualBranches: success > 0
+            ? Number((totalBranches / success).toFixed(2))
+            : 0,
+        averageBranchLength: totalBranches > 0
+            ? Number((totalBranchTiles / totalBranches).toFixed(2))
+            : 0,
+        maxBranchLength,
+        branchesWithTurns,
+        branchesWithoutTurns
+    });
+}
+
 
 //testPathCandidate();
 //testDynamicPath();
@@ -1305,3 +1410,4 @@ testCampaignCandidateSelection();
 testBranchCandidate();
 testBranchBatch();
 testAllDifficultyBranchBatch();
+testDeadEndBranchBatch();

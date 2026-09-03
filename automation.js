@@ -1671,6 +1671,14 @@ function addBranchesToCandidate(
         `${row},${col}`;
     const sameTile = (a, b) =>
         a[0] === b[0] && a[1] === b[1];
+    const directionBetween = (from, to) => [
+        to[0] - from[0],
+        to[1] - from[1]
+    ];
+    const sameDirection = (first, second) =>
+        first && second &&
+        first[0] === second[0] &&
+        first[1] === second[1];
     const shuffle = values => {
         for (
             let index = values.length - 1;
@@ -1692,6 +1700,8 @@ function addBranchesToCandidate(
         updated.path.map(coordinateKey)
     );
     const mechanicPositions = [
+        updated.start,
+        updated.goal,
         ...(updated.keys ?? []).map(
             key => key.position
         ),
@@ -1708,47 +1718,162 @@ function addBranchesToCandidate(
             arrow => arrow.position
         )
     ];
-    const mechanicKeys = new Set(
+    const forbiddenKeys = new Set(
         mechanicPositions.map(coordinateKey)
     );
-    const existingBranchKeys = new Set(
-        updated.branches.flatMap(branch =>
-            branch.map(coordinateKey)
-        )
-    );
-
     const plannedLength = updated.path.length - 1;
+    const minimumBranchLength = Math.min(
+        2,
+        maxBranchLength
+    );
     let addedBranches = 0;
 
-    for (
-        let attempt = 0;
-        attempt < maxAttempts &&
-        addedBranches < branchCount;
-        attempt++
-    ) {
-        if (updated.path.length < 5) {
-            break;
+    const getOpenKeys = walls => {
+        const wallKeys = new Set(walls.map(coordinateKey));
+        const openKeys = new Set();
+
+        for (let row = 0; row < updated.size; row++) {
+            for (let col = 0; col < updated.size; col++) {
+                const key = `${row},${col}`;
+
+                if (!wallKeys.has(key)) {
+                    openKeys.add(key);
+                }
+            }
         }
 
-        const rootIndex = 2 + Math.floor(
-            Math.random() * (updated.path.length - 4)
-        );
-        const root = updated.path[rootIndex];
-        const desiredLength = 1 + Math.floor(
-            Math.random() * maxBranchLength
-        );
-        const wallKeys = new Set(
-            updated.walls.map(coordinateKey)
-        );
-        const proposedBranch = [];
-        const proposedKeys = new Set();
-        let previous = root;
+        return openKeys;
+    };
 
-        for (
-            let step = 0;
-            step < desiredLength;
-            step++
-        ) {
+    const hasTurn = (root, branch) => {
+        const route = [root, ...branch];
+
+        for (let index = 2; index < route.length; index++) {
+            const previousDirection = directionBetween(
+                route[index - 2],
+                route[index - 1]
+            );
+            const nextDirection = directionBetween(
+                route[index - 1],
+                route[index]
+            );
+
+            if (!sameDirection(previousDirection, nextDirection)) {
+                return true;
+            }
+        }
+
+        return false;
+    };
+
+    const validateBranchTopology = (
+        root,
+        branch,
+        existingOpenKeys
+    ) => {
+        const branchKeys = new Set(
+            branch.map(coordinateKey)
+        );
+
+        if (branchKeys.size !== branch.length) {
+            return false;
+        }
+
+        let pathConnections = 0;
+
+        for (let index = 0; index < branch.length; index++) {
+            const position = branch[index];
+            const key = coordinateKey(position);
+
+            if (forbiddenKeys.has(key)) {
+                return false;
+            }
+
+            if (
+                index > 0 &&
+                !getNeighbors(
+                    position[0],
+                    position[1],
+                    updated.size
+                ).some(neighbor =>
+                    sameTile(neighbor, branch[index - 1])
+                )
+            ) {
+                return false;
+            }
+
+            const neighbors = getNeighbors(
+                position[0],
+                position[1],
+                updated.size
+            );
+            const pathNeighbors = neighbors.filter(neighbor =>
+                pathKeys.has(coordinateKey(neighbor))
+            );
+
+            pathConnections += pathNeighbors.length;
+
+            if (
+                index === 0
+                    ? pathNeighbors.length !== 1 ||
+                        !sameTile(pathNeighbors[0], root)
+                    : pathNeighbors.length !== 0
+            ) {
+                return false;
+            }
+
+            const openNeighborCount = neighbors.filter(neighbor => {
+                const neighborKey = coordinateKey(neighbor);
+                return existingOpenKeys.has(neighborKey) ||
+                    branchKeys.has(neighborKey);
+            }).length;
+            const expectedOpenNeighbors =
+                branch.length === 1
+                    ? 1
+                    : index === 0
+                        ? 2
+                        : index === branch.length - 1
+                            ? 1
+                            : 2;
+
+            if (openNeighborCount !== expectedOpenNeighbors) {
+                return false;
+            }
+        }
+
+        return pathConnections === 1;
+    };
+
+    const findBranch = (
+        root,
+        targetLength,
+        existingOpenKeys,
+        wallKeys,
+        requireTurn
+    ) => {
+        const branch = [];
+        const branchKeys = new Set();
+
+        const search = previous => {
+            if (branch.length === targetLength) {
+                return (
+                    (!requireTurn || hasTurn(root, branch)) &&
+                    validateBranchTopology(
+                        root,
+                        branch,
+                        existingOpenKeys
+                    )
+                );
+            }
+
+            const previousDirection = branch.length > 0
+                ? directionBetween(
+                    branch.length === 1
+                        ? root
+                        : branch[branch.length - 2],
+                    previous
+                )
+                : null;
             const choices = shuffle(
                 getNeighbors(
                     previous[0],
@@ -1760,79 +1885,163 @@ function addBranchesToCandidate(
 
                 if (
                     !wallKeys.has(key) ||
-                    mechanicKeys.has(key) ||
-                    existingBranchKeys.has(key) ||
-                    proposedKeys.has(key)
+                    forbiddenKeys.has(key) ||
+                    branchKeys.has(key)
                 ) {
                     return false;
                 }
 
-                const plannedNeighbors = getNeighbors(
+                const neighbors = getNeighbors(
                     position[0],
                     position[1],
                     updated.size
-                ).filter(neighbor =>
-                    pathKeys.has(coordinateKey(neighbor))
+                );
+                const existingOpenNeighbors = neighbors.filter(
+                    neighbor => existingOpenKeys.has(
+                        coordinateKey(neighbor)
+                    )
+                );
+                const branchNeighbors = neighbors.filter(
+                    neighbor => branchKeys.has(
+                        coordinateKey(neighbor)
+                    )
                 );
 
-                if (
-                    step === 0
-                        ? plannedNeighbors.length !== 1 ||
-                            !sameTile(plannedNeighbors[0], root)
-                        : plannedNeighbors.length !== 0
-                ) {
-                    return false;
-                }
-
-                const existingBranchNeighbors =
-                    getNeighbors(
-                        position[0],
-                        position[1],
-                        updated.size
-                    ).filter(neighbor =>
-                        existingBranchKeys.has(
-                            coordinateKey(neighbor)
-                        )
+                if (branch.length === 0) {
+                    return (
+                        existingOpenNeighbors.length === 1 &&
+                        sameTile(existingOpenNeighbors[0], root) &&
+                        branchNeighbors.length === 0
                     );
-
-                if (existingBranchNeighbors.length > 0) {
-                    return false;
                 }
 
-                const proposedNeighbors = getNeighbors(
-                    position[0],
-                    position[1],
-                    updated.size
-                ).filter(neighbor =>
-                    proposedKeys.has(coordinateKey(neighbor))
+                return (
+                    existingOpenNeighbors.length === 0 &&
+                    branchNeighbors.length === 1 &&
+                    sameTile(branchNeighbors[0], previous)
                 );
-
-                return step === 0
-                    ? proposedNeighbors.length === 0
-                    : proposedNeighbors.length === 1 &&
-                        sameTile(proposedNeighbors[0], previous);
             });
 
-            if (choices.length === 0) {
-                break;
+            choices.sort((first, second) => {
+                if (!previousDirection) {
+                    return 0;
+                }
+
+                const firstTurns = !sameDirection(
+                    previousDirection,
+                    directionBetween(previous, first)
+                );
+                const secondTurns = !sameDirection(
+                    previousDirection,
+                    directionBetween(previous, second)
+                );
+
+                return Number(secondTurns) - Number(firstTurns);
+            });
+
+            for (const next of choices) {
+                branch.push(next);
+                branchKeys.add(coordinateKey(next));
+
+                if (search(next)) {
+                    return true;
+                }
+
+                branch.pop();
+                branchKeys.delete(coordinateKey(next));
             }
 
-            const next = choices[0];
-            proposedBranch.push(next);
-            proposedKeys.add(coordinateKey(next));
-            previous = next;
+            return false;
+        };
+
+        return search(root) ? branch : null;
+    };
+
+    for (
+        let attempt = 0;
+        attempt < maxAttempts &&
+        addedBranches < branchCount;
+        attempt++
+    ) {
+        if (updated.path.length < 5) {
+            break;
         }
 
-        if (proposedBranch.length === 0) {
+        const eligibleRootIndexes = [];
+
+        for (
+            let index = 2;
+            index <= updated.path.length - 3;
+            index++
+        ) {
+            const root = updated.path[index];
+            const distanceFromStart =
+                Math.abs(root[0] - updated.start[0]) +
+                Math.abs(root[1] - updated.start[1]);
+            const distanceFromGoal =
+                Math.abs(root[0] - updated.goal[0]) +
+                Math.abs(root[1] - updated.goal[1]);
+
+            if (
+                distanceFromStart > 1 &&
+                distanceFromGoal > 1
+            ) {
+                eligibleRootIndexes.push(index);
+            }
+        }
+
+        if (eligibleRootIndexes.length === 0) {
+            break;
+        }
+
+        const rootIndex = eligibleRootIndexes[
+            Math.floor(
+                Math.random() * eligibleRootIndexes.length
+            )
+        ];
+        const root = updated.path[rootIndex];
+        const existingOpenKeys = getOpenKeys(updated.walls);
+        const wallKeys = new Set(
+            updated.walls.map(coordinateKey)
+        );
+        let proposedBranch = null;
+
+        for (
+            let length = maxBranchLength;
+            length >= minimumBranchLength && !proposedBranch;
+            length--
+        ) {
+            if (length >= 3) {
+                proposedBranch = findBranch(
+                    root,
+                    length,
+                    existingOpenKeys,
+                    wallKeys,
+                    true
+                );
+            }
+
+            if (!proposedBranch) {
+                proposedBranch = findBranch(
+                    root,
+                    length,
+                    existingOpenKeys,
+                    wallKeys,
+                    false
+                );
+            }
+        }
+
+        if (!proposedBranch) {
             continue;
         }
 
-        const proposedKeySet = new Set(
+        const proposedKeys = new Set(
             proposedBranch.map(coordinateKey)
         );
         const trial = structuredClone(updated);
         trial.walls = trial.walls.filter(
-            wall => !proposedKeySet.has(coordinateKey(wall))
+            wall => !proposedKeys.has(coordinateKey(wall))
         );
         trial.branches.push(proposedBranch);
 
@@ -1849,9 +2058,6 @@ function addBranchesToCandidate(
 
         updated.walls = trial.walls;
         updated.branches = trial.branches;
-        proposedBranch.forEach(position =>
-            existingBranchKeys.add(coordinateKey(position))
-        );
         addedBranches++;
     }
 
