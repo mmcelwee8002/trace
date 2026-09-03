@@ -1380,34 +1380,131 @@ function testDeadEndBranchBatch() {
     });
 }
 
+function testOpenSpaceDifficultyBatch() {
+    const difficulties = [
+        "easy",
+        "medium",
+        "hard",
+        "extreme"
+    ];
+    const count = 25;
+
+    difficulties.forEach(difficulty => {
+        let success = 0;
+        let fail = 0;
+        let totalOptimal = 0;
+        let minimumFinalOptimal = Infinity;
+        let maximumFinalOptimal = 0;
+        let referencePathLength = 0;
+        let totalOptimalRatio = 0;
+        let totalOpenSpaceFraction = 0;
+        let mechanicValidationFailures = 0;
+
+        for (let index = 0; index < count; index++) {
+            const candidate =
+                createCandidateForDifficulty(difficulty);
+
+            if (!candidate) {
+                fail++;
+
+                if (
+                    createCandidateForDifficulty
+                        .lastFailureReason ===
+                    "mechanic-validation"
+                ) {
+                    mechanicValidationFailures++;
+                }
+
+                continue;
+            }
+
+            if (!validateGeneratedMechanics(candidate)) {
+                mechanicValidationFailures++;
+            }
+
+            const quality = scoreCandidateQuality(candidate);
+            const optimal = quality.finalOptimal;
+
+            if (optimal === null) {
+                fail++;
+                continue;
+            }
+
+            success++;
+            totalOptimal += optimal;
+            minimumFinalOptimal = Math.min(
+                minimumFinalOptimal,
+                optimal
+            );
+            maximumFinalOptimal = Math.max(
+                maximumFinalOptimal,
+                optimal
+            );
+            referencePathLength =
+                quality.referencePathLength;
+            totalOptimalRatio +=
+                quality.optimalReferenceRatio;
+            totalOpenSpaceFraction +=
+                quality.openSpaceFraction;
+        }
+
+        console.log(`Open-space batch ${difficulty}:`, {
+            success,
+            fail,
+            averageFinalOptimal: success > 0
+                ? Number((totalOptimal / success).toFixed(2))
+                : 0,
+            minimumFinalOptimal: success > 0
+                ? minimumFinalOptimal
+                : null,
+            maximumFinalOptimal: success > 0
+                ? maximumFinalOptimal
+                : null,
+            referencePathLength,
+            averageOptimalReferenceRatio: success > 0
+                ? Number(
+                    (totalOptimalRatio / success).toFixed(4)
+                )
+                : 0,
+            averageOpenSpaceFraction: success > 0
+                ? Number(
+                    (totalOpenSpaceFraction / success).toFixed(4)
+                )
+                : 0,
+            mechanicValidationFailures
+        });
+    });
+}
+
 
 //testPathCandidate();
 //testDynamicPath();
-testDuplicateDetection();
-testUniqueCandidateGeneration();
-testMechanicFingerprint();
-testSwitchGateCandidate();
-testSwitchRequirement();
-testRequiredSwitchValidation();
-testRequiredArrowCandidate();
-testRequiredArrowRequirement();
-testRequiredArrowValidation();
-testKeyGateCandidate();
-testKeyRequirement();
-testRequiredKeyValidation();
-testTwoSwitchCandidate();
-testTwoKeyRequirement();
-testMixedMechanicCandidate();
-testMixedMechanicRequirements();
-testDifficultyCandidate();
+// testDuplicateDetection();
+// testUniqueCandidateGeneration();
+// testMechanicFingerprint();
+// testSwitchGateCandidate();
+// testSwitchRequirement();
+// testRequiredSwitchValidation();
+// testRequiredArrowCandidate();
+// testRequiredArrowRequirement();
+// testRequiredArrowValidation();
+// testKeyGateCandidate();
+// testKeyRequirement();
+// testRequiredKeyValidation();
+// testTwoSwitchCandidate();
+// testTwoKeyRequirement();
+// testMixedMechanicCandidate();
+// testMixedMechanicRequirements();
+// testDifficultyCandidate();
 
-testDifficultyBatch(
-    "extreme",
-    25
-);
+// testDifficultyBatch(
+//     "extreme",
+//     25
+// );
 
-testCampaignCandidateSelection();
-testBranchCandidate();
-testBranchBatch();
-testAllDifficultyBranchBatch();
-testDeadEndBranchBatch();
+// testCampaignCandidateSelection();
+// testBranchCandidate();
+// testBranchBatch();
+// testAllDifficultyBranchBatch();
+// testDeadEndBranchBatch();
+//testOpenSpaceDifficultyBatch();

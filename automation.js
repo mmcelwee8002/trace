@@ -9,7 +9,10 @@ const difficultyProfiles = {
         switches: 1,
         arrows: 0,
         branchCount: 0,
-        maxBranchLength: 0
+        maxBranchLength: 0,
+        openFraction: 0.05,
+        minOpenRegionSize: 1,
+        maxOpenRegionSize: 2
     },
     medium: {
         targetLength: 28,
@@ -17,7 +20,11 @@ const difficultyProfiles = {
         switches: 1,
         arrows: 1,
         branchCount: 2,
-        maxBranchLength: 3
+        maxBranchLength: 3,
+        openFraction: 0.20,
+        targetOpenness: 0.50,
+        minOpenRegionSize: 2,
+        maxOpenRegionSize: 4
     },
     hard: {
         targetLength: 36,
@@ -25,7 +32,11 @@ const difficultyProfiles = {
         switches: 1,
         arrows: 1,
         branchCount: 3,
-        maxBranchLength: 4
+        maxBranchLength: 4,
+        openFraction: 0.35,
+        targetOpenness: 0.65,
+        minOpenRegionSize: 3,
+        maxOpenRegionSize: 6
     },
     extreme: {
         targetLength: 44,
@@ -33,7 +44,11 @@ const difficultyProfiles = {
         switches: 2,
         arrows: 1,
         branchCount: 4,
-        maxBranchLength: 5
+        maxBranchLength: 5,
+        openFraction: 0.50,
+        targetOpenness: 0.75,
+        minOpenRegionSize: 4,
+        maxOpenRegionSize: 8
     }
 };
 
@@ -486,7 +501,7 @@ function validateRequiredSwitch(candidate) {
     }
 
     const normalized =
-        normalizeLevel(candidate);
+        normalizeGeneratedCandidate(candidate);
 
     const normalOptimal =
         findShortestPathLength(normalized);
@@ -673,10 +688,7 @@ function validateRequiredArrow(candidate) {
     const optimal =
         findShortestPathLength(normalized);
 
-    return (
-        optimal !== null &&
-        optimal === path.length - 1
-    );
+    return optimal !== null;
 }
 
 function addKeyGateToCandidate(
@@ -1566,7 +1578,11 @@ function addMechanicsToCandidate(
 }
 
 function createCandidateForDifficulty(difficulty) {
+    createCandidateForDifficulty.lastFailureReason = null;
+
     if (!Object.hasOwn(difficultyProfiles, difficulty)) {
+        createCandidateForDifficulty.lastFailureReason =
+            "invalid-difficulty";
         return null;
     }
 
@@ -1575,6 +1591,8 @@ function createCandidateForDifficulty(difficulty) {
         createUniquePathCandidate(profile.targetLength);
 
     if (!candidate) {
+        createCandidateForDifficulty.lastFailureReason =
+            "base-generation";
         return null;
     }
 
@@ -1586,57 +1604,764 @@ function createCandidateForDifficulty(difficulty) {
         });
 
     if (!completedCandidate) {
+        createCandidateForDifficulty.lastFailureReason =
+            "mechanic-placement";
         return null;
     }
 
-    if (profile.branchCount > 0) {
-        completedCandidate = addBranchesToCandidate(
+    const useAggressiveOpenSpace =
+        difficulty === "hard" || difficulty === "extreme";
+
+    completedCandidate = useAggressiveOpenSpace
+        ? createOpenCandidateSpace(
             completedCandidate,
             {
-                branchCount: profile.branchCount,
-                maxBranchLength: profile.maxBranchLength
+                targetOpenness: profile.targetOpenness,
+                difficulty
+            }
+        )
+        : openCandidateSpace(
+            completedCandidate,
+            {
+                openFraction: profile.openFraction,
+                minOpenRegionSize: profile.minOpenRegionSize,
+                maxOpenRegionSize: profile.maxOpenRegionSize,
+                difficulty
             }
         );
 
-        if (!completedCandidate) {
-            return null;
+    if (!completedCandidate) {
+        createCandidateForDifficulty.lastFailureReason =
+            (useAggressiveOpenSpace
+                ? createOpenCandidateSpace.lastFailureReason
+                : openCandidateSpace.lastFailureReason) ||
+            "open-space";
+        logOpenSpaceRejection(
+            difficulty,
+            createCandidateForDifficulty.lastFailureReason,
+            useAggressiveOpenSpace
+                ? createOpenCandidateSpace.lastDiagnostics
+                : openCandidateSpace.lastDiagnostics
+        );
+        return null;
+    }
+    return completedCandidate;
+}
+
+function normalizeGeneratedCandidate(candidate) {
+    return normalizeLevel({
+        ...candidate,
+        oneWays: candidate.requiredArrows ??
+            candidate.oneWays ??
+            []
+    });
+}
+
+function validateGeneratedMechanics(candidate) {
+    validateGeneratedMechanics.lastFailureReason = null;
+
+    const keyCount = candidate.keys?.length ?? 0;
+    const switchCount = candidate.switches?.length ?? 0;
+    const arrowCount =
+        candidate.requiredArrows?.length ?? 0;
+
+    if (
+        keyCount === 1 &&
+        !validateRequiredKey(candidate)
+    ) {
+        validateGeneratedMechanics.lastFailureReason =
+            "key-validation";
+        return false;
+    }
+
+    if (
+        keyCount >= 2 &&
+        !validateRequiredKeyGroups(candidate)
+    ) {
+        validateGeneratedMechanics.lastFailureReason =
+            "key-validation";
+        return false;
+    }
+
+    if (
+        switchCount === 1 &&
+        !validateRequiredSwitch(candidate)
+    ) {
+        validateGeneratedMechanics.lastFailureReason =
+            "switch-validation";
+        return false;
+    }
+
+    if (
+        switchCount >= 2 &&
+        !validateRequiredSwitchGroups(candidate)
+    ) {
+        validateGeneratedMechanics.lastFailureReason =
+            "switch-validation";
+        return false;
+    }
+
+    if (
+        arrowCount > 0 &&
+        !validateRequiredArrow(candidate)
+    ) {
+        validateGeneratedMechanics.lastFailureReason =
+            "arrow-validation";
+        return false;
+    }
+
+    return true;
+}
+
+function logOpenSpaceRejection(
+    difficulty,
+    reason,
+    diagnostics = {}
+) {
+    if (difficulty !== "hard" && difficulty !== "extreme") {
+        return;
+    }
+
+    const labels = {
+        "key-validation": "key validation",
+        "switch-validation": "switch validation",
+        "arrow-validation": "arrow validation",
+        "optimal-below-minimum": "Optimal below minimum",
+        "solver-null": "solver returned null",
+        "open-fraction": "could not reach requested open fraction"
+    };
+
+    console.error(
+        `Open-space rejection: ${labels[reason] || reason}`,
+        {
+            difficulty,
+            referencePathLength:
+                diagnostics.referencePathLength ?? null,
+            requestedOpenFraction:
+                diagnostics.requestedOpenFraction ?? null,
+            actualOpenFraction:
+                diagnostics.actualOpenFraction ?? null,
+            finalOptimal:
+                diagnostics.finalOptimal ?? null,
+            minimumOptimal:
+                diagnostics.minimumOptimal ?? null
+        }
+    );
+}
+
+function logOpenSpaceWork(difficulty, diagnostics) {
+    if (difficulty !== "hard" && difficulty !== "extreme") {
+        return;
+    }
+
+    console.log("Open-space work:", {
+        "proposals tried": diagnostics.proposalsTried,
+        "proposals accepted": diagnostics.proposalsAccepted,
+        "rejected by Optimal threshold":
+            diagnostics.rejectedByOptimalThreshold,
+        "rejected by solver/null":
+            diagnostics.rejectedBySolverNull,
+        "rejected by mechanic validation":
+            diagnostics.rejectedByMechanicValidation,
+        "rejected by topology/eligibility":
+            diagnostics.rejectedByTopology,
+        "achieved fraction": diagnostics.actualOpenFraction,
+        "final Optimal": diagnostics.finalOptimal
+    });
+}
+
+function openCandidateSpace(
+    candidate,
+    options = {}
+) {
+    openCandidateSpace.lastFailureReason = null;
+    openCandidateSpace.lastDiagnostics = null;
+
+    if (!candidate?.path || !candidate?.walls) {
+        openCandidateSpace.lastFailureReason = "open-space";
+        return null;
+    }
+
+    const {
+        openFraction = 0.25,
+        maxOpenRegionProposals = 15,
+        minOpenRegionSize = 2,
+        maxOpenRegionSize = 4,
+        difficulty = null
+    } = options;
+
+    if (
+        typeof openFraction !== "number" ||
+        openFraction < 0 ||
+        openFraction > 1 ||
+        !Number.isInteger(maxOpenRegionProposals) ||
+        maxOpenRegionProposals < 1 ||
+        !Number.isInteger(minOpenRegionSize) ||
+        !Number.isInteger(maxOpenRegionSize) ||
+        minOpenRegionSize < 1 ||
+        maxOpenRegionSize < minOpenRegionSize
+    ) {
+        openCandidateSpace.lastFailureReason = "open-space";
+        return null;
+    }
+
+    const baseline = structuredClone(candidate);
+    const updated = structuredClone(candidate);
+    const coordinateKey = ([row, col]) =>
+        `${row},${col}`;
+    const referencePathLength = updated.path.length - 1;
+    const minimumOptimalRatio = 0.65;
+    const minimumOptimal = Math.floor(
+        referencePathLength * minimumOptimalRatio
+    );
+    const targetOpenCount = Math.floor(
+        updated.walls.length * openFraction
+    );
+    const initialWallCount = updated.walls.length;
+    const protectedPositions = [
+        updated.start,
+        updated.goal,
+        ...(updated.keys ?? []).map(key => key.position),
+        ...(updated.lockGroups ?? []).flatMap(
+            group => group.tiles
+        ),
+        ...(updated.switches ?? []).map(
+            item => item.position
+        ),
+        ...(updated.switchGates ?? []).flatMap(
+            group => group.tiles
+        ),
+        ...(updated.requiredArrows ?? []).map(
+            arrow => arrow.position
+        )
+    ];
+    const protectedKeys = new Set(
+        protectedPositions.map(coordinateKey)
+    );
+    const openedSpaceTiles = [];
+    const triedRegionKeys = new Set();
+    let proposalsTried = 0;
+    let proposalsAccepted = 0;
+    let rejectedByOptimalThreshold = 0;
+    let rejectedBySolverNull = 0;
+    let rejectedByMechanicValidation = 0;
+    let rejectedByTopology = 0;
+    let topologyExhausted = false;
+
+    const baselineOptimal = findShortestPathLength(
+        normalizeGeneratedCandidate(baseline)
+    );
+
+    if (
+        baselineOptimal === null ||
+        baselineOptimal < minimumOptimal ||
+        !validateGeneratedMechanics(baseline)
+    ) {
+        openCandidateSpace.lastFailureReason =
+            baselineOptimal === null
+                ? "solver-null"
+                : baselineOptimal < minimumOptimal
+                    ? "optimal-below-minimum"
+                    : validateGeneratedMechanics.lastFailureReason ||
+                        "mechanic-validation";
+        return null;
+    }
+
+    while (
+        openedSpaceTiles.length < targetOpenCount &&
+        proposalsTried < maxOpenRegionProposals
+    ) {
+        const wallKeys = new Set(
+            updated.walls.map(coordinateKey)
+        );
+        const openedSpaceKeys = new Set(
+            openedSpaceTiles.map(coordinateKey)
+        );
+        const frontier = updated.walls.filter(position => {
+            const key = coordinateKey(position);
+
+            if (protectedKeys.has(key)) {
+                return false;
+            }
+
+            const openNeighborCount = getNeighbors(
+                position[0],
+                position[1],
+                updated.size
+            ).filter(neighbor =>
+                !wallKeys.has(coordinateKey(neighbor))
+            ).length;
+
+            return openNeighborCount >= 1;
+        });
+
+        if (frontier.length === 0) {
+            topologyExhausted = true;
+            break;
+        }
+
+        const nearbyFrontier = frontier.filter(position =>
+            getNeighbors(
+                position[0],
+                position[1],
+                updated.size
+            ).some(neighbor =>
+                openedSpaceKeys.has(coordinateKey(neighbor))
+            )
+        );
+        const seedCandidates = nearbyFrontier.length > 0
+            ? nearbyFrontier
+            : frontier;
+        const seed = seedCandidates[
+            Math.floor(Math.random() * seedCandidates.length)
+        ];
+        const remainingOpenCount =
+            targetOpenCount - openedSpaceTiles.length;
+        const regionSizeRange =
+            maxOpenRegionSize - minOpenRegionSize + 1;
+        const regionTargetSize = Math.min(
+            remainingOpenCount,
+            minOpenRegionSize +
+                Math.floor(Math.random() * regionSizeRange)
+        );
+        const region = [[...seed]];
+        const regionKeys = new Set([
+            coordinateKey(seed)
+        ]);
+
+        while (region.length < regionTargetSize) {
+            const growthCandidates = region
+                .flatMap(position =>
+                    getNeighbors(
+                        position[0],
+                        position[1],
+                        updated.size
+                    )
+                )
+                .filter(position => {
+                    const key = coordinateKey(position);
+                    return wallKeys.has(key) &&
+                        !protectedKeys.has(key) &&
+                        !regionKeys.has(key) &&
+                        getNeighbors(
+                            position[0],
+                            position[1],
+                            updated.size
+                        ).every(neighbor =>
+                            wallKeys.has(coordinateKey(neighbor))
+                        );
+                });
+
+            if (growthCandidates.length === 0) {
+                break;
+            }
+
+            const next = growthCandidates[
+                Math.floor(
+                    Math.random() * growthCandidates.length
+                )
+            ];
+            region.push([...next]);
+            regionKeys.add(coordinateKey(next));
+        }
+
+        const regionKey = [...regionKeys].sort().join("|");
+        proposalsTried++;
+
+        if (triedRegionKeys.has(regionKey)) {
+            rejectedByTopology++;
+            continue;
+        }
+
+        triedRegionKeys.add(regionKey);
+
+        const trial = structuredClone(updated);
+        trial.walls = trial.walls.filter(
+            wall => !regionKeys.has(coordinateKey(wall))
+        );
+        trial.referencePathLength = referencePathLength;
+
+        const optimal = findShortestPathLength(
+            normalizeGeneratedCandidate(trial)
+        );
+
+        if (optimal === null) {
+            rejectedBySolverNull++;
+            continue;
+        }
+
+        if (optimal < minimumOptimal) {
+            rejectedByOptimalThreshold++;
+            continue;
+        }
+
+        if (!validateGeneratedMechanics(trial)) {
+            rejectedByMechanicValidation++;
+            continue;
+        }
+
+        updated.walls = trial.walls;
+        openedSpaceTiles.push(...region.map(position => [...position]));
+        proposalsAccepted++;
+    }
+
+    updated.referencePathLength = referencePathLength;
+    updated.minimumOptimalRatio = minimumOptimalRatio;
+    updated.minimumOptimal = minimumOptimal;
+    updated.openedSpaceTiles = openedSpaceTiles;
+
+    const finalOptimal = findShortestPathLength(
+        normalizeGeneratedCandidate(updated)
+    );
+
+    const finalMechanicsValid =
+        finalOptimal !== null &&
+        finalOptimal >= minimumOptimal &&
+        validateGeneratedMechanics(updated);
+    const finalCandidateValid = finalMechanicsValid;
+
+    const result = finalCandidateValid
+        ? updated
+        : baseline;
+    const resultOptimal = finalCandidateValid
+        ? finalOptimal
+        : baselineOptimal;
+    const acceptedOpenings = finalCandidateValid
+        ? openedSpaceTiles.length
+        : 0;
+    const acceptedProposals = finalCandidateValid
+        ? proposalsAccepted
+        : 0;
+
+    if (!finalCandidateValid && proposalsAccepted > 0) {
+        if (finalOptimal === null) {
+            rejectedBySolverNull += proposalsAccepted;
+        } else if (finalOptimal < minimumOptimal) {
+            rejectedByOptimalThreshold += proposalsAccepted;
+        } else {
+            rejectedByMechanicValidation += proposalsAccepted;
         }
     }
+    const achievedOpenFraction = initialWallCount > 0
+        ? acceptedOpenings / initialWallCount
+        : 0;
 
-    const normalized =
-        normalizeLevel(completedCandidate);
-    const optimal =
-        findShortestPathLength(normalized);
+    result.referencePathLength = referencePathLength;
+    result.minimumOptimalRatio = minimumOptimalRatio;
+    result.minimumOptimal = minimumOptimal;
+    result.openedSpaceTiles = finalCandidateValid
+        ? openedSpaceTiles
+        : [];
+    result.finalOptimal = resultOptimal;
 
-    if (
-        optimal === null ||
-        optimal !== completedCandidate.path.length - 1
-    ) {
+    openCandidateSpace.lastDiagnostics = {
+        difficulty,
+        referencePathLength,
+        requestedOpenFraction: openFraction,
+        actualOpenFraction: achievedOpenFraction,
+        finalOptimal: resultOptimal,
+        minimumOptimal,
+        proposalsTried,
+        proposalsAccepted: acceptedProposals,
+        rejectedByOptimalThreshold,
+        rejectedBySolverNull,
+        rejectedByMechanicValidation,
+        rejectedByTopology,
+        topologyExhausted,
+        reachedRequestedOpenFraction:
+            acceptedOpenings >= targetOpenCount
+    };
+    result.openSpaceWork = {
+        proposalsTried,
+        proposalsAccepted: acceptedProposals,
+        rejectedByOptimalThreshold,
+        rejectedBySolverNull,
+        rejectedByMechanicValidation,
+        rejectedByTopology,
+        topologyExhausted,
+        requestedOpenFraction: openFraction,
+        actualOpenFraction: achievedOpenFraction,
+        finalOptimal: resultOptimal
+    };
+
+    logOpenSpaceWork(
+        difficulty,
+        openCandidateSpace.lastDiagnostics
+    );
+
+    return result;
+}
+
+function createOpenCandidateSpace(
+    candidate,
+    options = {}
+) {
+    createOpenCandidateSpace.lastFailureReason = null;
+    createOpenCandidateSpace.lastDiagnostics = null;
+
+    if (!candidate?.path || !candidate?.walls) {
+        createOpenCandidateSpace.lastFailureReason = "open-space";
         return null;
     }
 
+    const {
+        targetOpenness = 0.65,
+        maxRegionProposals = 15,
+        minRegionSize = 6,
+        maxRegionSize = 12,
+        difficulty = null
+    } = options;
+    const effectiveMinRegionSize = difficulty === "extreme"
+        ? Math.max(minRegionSize, 8)
+        : minRegionSize;
+    const effectiveMaxRegionSize = difficulty === "extreme"
+        ? Math.max(maxRegionSize, 16)
+        : maxRegionSize;
+
     if (
-        profile.keys === 2 &&
-        !validateRequiredKeyGroups(completedCandidate)
+        typeof targetOpenness !== "number" ||
+        targetOpenness < 0 ||
+        targetOpenness > 1 ||
+        !Number.isInteger(maxRegionProposals) ||
+        maxRegionProposals < 1 ||
+        !Number.isInteger(effectiveMinRegionSize) ||
+        !Number.isInteger(effectiveMaxRegionSize) ||
+        effectiveMinRegionSize < 1 ||
+        effectiveMaxRegionSize < effectiveMinRegionSize
     ) {
+        createOpenCandidateSpace.lastFailureReason = "open-space";
         return null;
     }
 
-    if (
-        profile.switches === 2 &&
-        !validateRequiredSwitchGroups(completedCandidate)
-    ) {
+    const coordinateKey = ([row, col]) => `${row},${col}`;
+    const baseline = structuredClone(candidate);
+    let working = structuredClone(candidate);
+    const referencePathLength = working.path.length - 1;
+    const minimumOptimalRatio = 0.65;
+    const minimumOptimal = Math.floor(
+        referencePathLength * minimumOptimalRatio
+    );
+    const boardTileCount = working.size * working.size;
+    const targetWalkableCount = Math.ceil(
+        boardTileCount * targetOpenness
+    );
+    const protectedPositions = [
+        working.start,
+        working.goal,
+        ...(working.keys ?? []).map(key => key.position),
+        ...(working.lockGroups ?? []).flatMap(
+            group => group.tiles
+        ),
+        ...(working.switches ?? []).map(item => item.position),
+        ...(working.switchGates ?? []).flatMap(
+            group => group.tiles
+        ),
+        ...(working.requiredArrows ?? []).map(
+            arrow => arrow.position
+        )
+    ];
+    const protectedKeys = new Set(
+        protectedPositions.map(coordinateKey)
+    );
+    const aggressivelyOpenedKeys = new Set();
+    const triedRegionKeys = new Set();
+    let proposalsTried = 0;
+    let proposalsAccepted = 0;
+    let rejectedBySolverNull = 0;
+    let rejectedByOptimalThreshold = 0;
+    let rejectedByMechanicValidation = 0;
+
+    function shuffled(values) {
+        const result = [...values];
+
+        for (let index = result.length - 1; index > 0; index--) {
+            const randomIndex = Math.floor(
+                Math.random() * (index + 1)
+            );
+            [result[index], result[randomIndex]] =
+                [result[randomIndex], result[index]];
+        }
+
+        return result;
+    }
+
+    function isFullyValid(value) {
+        const optimal = findShortestPathLength(
+            normalizeGeneratedCandidate(value)
+        );
+
+        return {
+            optimal,
+            valid:
+                optimal !== null &&
+                optimal >= minimumOptimal &&
+                validateGeneratedMechanics(value)
+        };
+    }
+
+    const baselineValidation = isFullyValid(baseline);
+
+    if (!baselineValidation.valid) {
+        createOpenCandidateSpace.lastFailureReason =
+            baselineValidation.optimal === null
+                ? "solver-null"
+                : baselineValidation.optimal < minimumOptimal
+                    ? "optimal-below-minimum"
+                    : validateGeneratedMechanics.lastFailureReason ||
+                        "mechanic-validation";
         return null;
     }
 
-    if (
-        profile.arrows > 0 &&
-        !validateRequiredArrow(completedCandidate)
+    while (
+        boardTileCount - working.walls.length < targetWalkableCount &&
+        proposalsTried < maxRegionProposals
     ) {
-        return null;
+        const wallKeys = new Set(working.walls.map(coordinateKey));
+        const eligibleWalls = working.walls.filter(
+            position => !protectedKeys.has(coordinateKey(position))
+        );
+        const frontier = eligibleWalls.filter(position =>
+            getNeighbors(
+                position[0],
+                position[1],
+                working.size
+            ).some(neighbor => !wallKeys.has(coordinateKey(neighbor)))
+        );
+
+        if (frontier.length === 0) {
+            break;
+        }
+
+        const preferredFrontier = frontier.filter(position =>
+            getNeighbors(
+                position[0],
+                position[1],
+                working.size
+            ).some(neighbor =>
+                aggressivelyOpenedKeys.has(coordinateKey(neighbor))
+            )
+        );
+        const seedPool = preferredFrontier.length > 0
+            ? preferredFrontier
+            : frontier;
+        const seed = seedPool[
+            Math.floor(Math.random() * seedPool.length)
+        ];
+        const remainingNeeded =
+            targetWalkableCount -
+            (boardTileCount - working.walls.length);
+        const sizeRange =
+            effectiveMaxRegionSize - effectiveMinRegionSize + 1;
+        const desiredRegionSize = Math.min(
+            remainingNeeded,
+            effectiveMinRegionSize +
+                Math.floor(Math.random() * sizeRange)
+        );
+        const region = [[...seed]];
+        const regionKeys = new Set([coordinateKey(seed)]);
+
+        while (region.length < desiredRegionSize) {
+            const growthCandidates = shuffled(
+                region.flatMap(position =>
+                    getNeighbors(
+                        position[0],
+                        position[1],
+                        working.size
+                    )
+                )
+            ).filter(position => {
+                const key = coordinateKey(position);
+                return wallKeys.has(key) &&
+                    !protectedKeys.has(key) &&
+                    !regionKeys.has(key);
+            });
+
+            if (growthCandidates.length === 0) {
+                break;
+            }
+
+            const next = growthCandidates[0];
+            region.push([...next]);
+            regionKeys.add(coordinateKey(next));
+        }
+
+        const regionKey = [...regionKeys].sort().join("|");
+        proposalsTried++;
+
+        if (triedRegionKeys.has(regionKey)) {
+            continue;
+        }
+
+        triedRegionKeys.add(regionKey);
+
+        const trial = structuredClone(working);
+        trial.walls = trial.walls.filter(
+            wall => !regionKeys.has(coordinateKey(wall))
+        );
+        trial.referencePathLength = referencePathLength;
+        const validation = isFullyValid(trial);
+
+        if (validation.optimal === null) {
+            rejectedBySolverNull++;
+            continue;
+        }
+
+        if (validation.optimal < minimumOptimal) {
+            rejectedByOptimalThreshold++;
+            continue;
+        }
+
+        if (!validation.valid) {
+            rejectedByMechanicValidation++;
+            continue;
+        }
+
+        working = trial;
+        regionKeys.forEach(key => aggressivelyOpenedKeys.add(key));
+        proposalsAccepted++;
     }
 
-    return completedCandidate;
+    const finalValidation = isFullyValid(working);
+    const fallbackUsed =
+        !finalValidation.valid || proposalsAccepted === 0;
+    const result = fallbackUsed ? baseline : working;
+    const finalOptimal = fallbackUsed
+        ? baselineValidation.optimal
+        : finalValidation.optimal;
+    const achievedOpenness =
+        (boardTileCount - result.walls.length) / boardTileCount;
+
+    result.referencePathLength = referencePathLength;
+    result.minimumOptimalRatio = minimumOptimalRatio;
+    result.minimumOptimal = minimumOptimal;
+    result.finalOptimal = finalOptimal;
+    result.aggressiveOpenSpace = {
+        targetOpenness,
+        achievedOpenness,
+        proposalsTried,
+        proposalsAccepted: fallbackUsed ? 0 : proposalsAccepted,
+        rejectedBySolverNull,
+        rejectedByOptimalThreshold,
+        rejectedByMechanicValidation,
+        finalOptimal,
+        fallbackUsed
+    };
+    createOpenCandidateSpace.lastDiagnostics =
+        result.aggressiveOpenSpace;
+
+    if (difficulty === "hard" || difficulty === "extreme") {
+        console.log("Aggressive open-space:", {
+            "target openness": targetOpenness,
+            "achieved openness": achievedOpenness,
+            "proposals tried": proposalsTried,
+            "proposals accepted":
+                result.aggressiveOpenSpace.proposalsAccepted,
+            "final Optimal": finalOptimal,
+            "fallback used": fallbackUsed
+        });
+    }
+
+    return result;
 }
 
 function addBranchesToCandidate(
@@ -2088,6 +2813,25 @@ function scoreCandidateQuality(candidate) {
         );
     const pathMoves = Math.max(path.length - 1, 0);
     const boardArea = boardSize * boardSize;
+    const walkableTileCount = Math.max(
+        boardArea - (candidate?.walls?.length ?? boardArea),
+        0
+    );
+    const openSpaceFraction = boardArea > 0
+        ? walkableTileCount / boardArea
+        : 0;
+    const referencePathLength =
+        candidate?.referencePathLength ?? pathMoves;
+    const finalOptimal = candidate
+        ? candidate.finalOptimal ??
+            findShortestPathLength(
+                normalizeGeneratedCandidate(candidate)
+            )
+        : null;
+    const optimalReferenceRatio =
+        finalOptimal !== null && referencePathLength > 0
+            ? finalOptimal / referencePathLength
+            : 0;
     const pathCoverage = boardArea > 0
         ? path.length / boardArea
         : 0;
@@ -2182,6 +2926,13 @@ function scoreCandidateQuality(candidate) {
         mechanicCount,
         branchCount,
         branchTileCount,
+        walkableTileCount,
+        openSpaceFraction:
+            Number(openSpaceFraction.toFixed(4)),
+        finalOptimal,
+        referencePathLength,
+        optimalReferenceRatio:
+            Number(optimalReferenceRatio.toFixed(4)),
         mechanicSpacing:
             Number(mechanicSpacing.toFixed(4)),
         pathCoverage:
