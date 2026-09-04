@@ -155,6 +155,49 @@ function loadOpenBoardPreview(difficulty = "medium") {
     return candidate;
 }
 
+function loadMazePreview() {
+    const candidate = createMazeCandidate(15);
+
+    if (!candidate) {
+        console.error("Maze preview generation failed");
+        return null;
+    }
+
+    const previewLevel = {
+        ...candidate,
+        id: "generated-maze-preview",
+        title: "Generated Maze Preview"
+    };
+
+    let normalizedPreview;
+
+    try {
+        normalizedPreview =
+            loadTemporaryLevelPreview(previewLevel);
+    } catch (error) {
+        console.error("Maze preview could not be loaded", error);
+        return null;
+    }
+
+    const optimal = findShortestPathLength(normalizedPreview);
+    const boardTileCount = candidate.size * candidate.size;
+    const walkableTileCount =
+        boardTileCount - candidate.walls.length;
+
+    window.currentGeneratedPreview = candidate;
+    window.currentGeneratedPreviewDifficulty = "maze";
+
+    console.log("Maze preview:", {
+        "board size": candidate.size,
+        "walkable tile count": walkableTileCount,
+        "wall count": candidate.walls.length,
+        Optimal: optimal,
+        "generation work/attempts": candidate.generationWork
+    });
+
+    return candidate;
+}
+
 function regenerateGeneratedPreview() {
     if (!currentGeneratedPreviewDifficulty) {
         console.error(
