@@ -1,4 +1,6 @@
 const MAZE_V2_TOUCH_TOLERANCE = 1.2;
+const MAZE_V2_TRACE_WIDTH_RATIO = 0.5;
+const MAZE_V2_WALL_WIDTH = "2px";
 
 function createMazeV2Candidate(rows = 12, cols = 12) {
     if (
@@ -76,6 +78,36 @@ function createMazeV2Candidate(rows = 12, cols = 12) {
         return null;
     }
 
+    const midpoint = Math.floor(solution.length / 2);
+    let checkpointPathIndex = midpoint;
+    const checkpointSearchRadius = Math.min(8, midpoint - 1);
+
+    for (let offset = 0; offset <= checkpointSearchRadius; offset++) {
+        const indexes = offset === 0
+            ? [midpoint]
+            : [midpoint - offset, midpoint + offset];
+        const intersectionIndex = indexes.find(index => {
+            if (index <= 0 || index >= solution.length - 1) {
+                return false;
+            }
+
+            const cell = cells[
+                solution[index].row
+            ][solution[index].col];
+            const openSides = Object.values(cell.walls)
+                .filter(hasWall => !hasWall)
+                .length;
+            return openSides >= 3;
+        });
+
+        if (intersectionIndex !== undefined) {
+            checkpointPathIndex = intersectionIndex;
+            break;
+        }
+    }
+
+    const checkpoint = { ...solution[checkpointPathIndex] };
+
     return {
         id: "MAZE-V2-EXPERIMENT",
         title: "Maze V2",
@@ -84,6 +116,8 @@ function createMazeV2Candidate(rows = 12, cols = 12) {
         cells,
         start,
         goal,
+        checkpoint,
+        checkpointPathIndex,
         solutionLength: solution.length - 1,
         solution,
         keys: [],
@@ -243,7 +277,8 @@ function findMazeV2FarthestCell(maze, origin) {
 function renderMazeV2Preview(
     maze,
     boardElement,
-    touchTolerance = MAZE_V2_TOUCH_TOLERANCE
+    touchTolerance = MAZE_V2_TOUCH_TOLERANCE,
+    traceWidthRatio = MAZE_V2_TRACE_WIDTH_RATIO
 ) {
     if (!maze || !boardElement) {
         return null;
@@ -272,6 +307,8 @@ function renderMazeV2Preview(
     let activePath = [];
     let isTracing = false;
     let completed = false;
+    let checkpointActivated = false;
+    let checkpointPath = [];
 
     for (let row = 0; row < maze.rows; row++) {
         for (let col = 0; col < maze.cols; col++) {
@@ -286,28 +323,44 @@ function renderMazeV2Preview(
             element.style.placeItems = "center";
             element.style.background = "var(--tile-background)";
             element.style.borderTop = cell.walls.top
-                ? "2px solid var(--wall-border)"
-                : "2px solid transparent";
+                ? `${MAZE_V2_WALL_WIDTH} solid var(--wall-border)`
+                : `${MAZE_V2_WALL_WIDTH} solid transparent`;
             element.style.borderLeft = cell.walls.left
-                ? "2px solid var(--wall-border)"
-                : "2px solid transparent";
+                ? `${MAZE_V2_WALL_WIDTH} solid var(--wall-border)`
+                : `${MAZE_V2_WALL_WIDTH} solid transparent`;
             element.style.borderRight =
                 col === maze.cols - 1 && cell.walls.right
-                    ? "2px solid var(--wall-border)"
+                    ? `${MAZE_V2_WALL_WIDTH} solid var(--wall-border)`
                     : "0";
             element.style.borderBottom =
                 row === maze.rows - 1 && cell.walls.bottom
-                    ? "2px solid var(--wall-border)"
+                    ? `${MAZE_V2_WALL_WIDTH} solid var(--wall-border)`
                     : "0";
 
             if (row === maze.start.row && col === maze.start.col) {
-                element.innerHTML = "&#9679;";
+                element.innerHTML = "<span>&#9679;</span>";
                 element.style.color = "var(--start-background)";
                 element.style.fontSize = "clamp(0.7rem, 3vw, 1.3rem)";
             } else if (row === maze.goal.row && col === maze.goal.col) {
-                element.innerHTML = "&#9733;";
+                element.innerHTML = "<span>&#9733;</span>";
                 element.style.color = "var(--goal-background)";
                 element.style.fontSize = "clamp(0.8rem, 3vw, 1.4rem)";
+            } else if (
+                row === maze.checkpoint.row &&
+                col === maze.checkpoint.col
+            ) {
+                element.innerHTML = "<span>&#9671;</span>";
+                element.style.color = "#f59e0b";
+                element.style.fontSize = "clamp(0.65rem, 2.6vw, 1.15rem)";
+            }
+
+            element.style.fontWeight = "900";
+            element.style.zIndex = "0";
+            const marker = element.querySelector("span");
+
+            if (marker) {
+                marker.style.position = "relative";
+                marker.style.zIndex = "2";
             }
 
             elements.set(`${row},${col}`, element);
@@ -316,17 +369,70 @@ function renderMazeV2Preview(
     }
 
     function renderPath() {
-        const pathKeys = new Set(activePath.map(positionKey));
+        elements.forEach(element => {
+            element.querySelectorAll(".maze-v2-trace-segment")
+                .forEach(segment => segment.remove());
+        });
 
-        elements.forEach((element, key) => {
-            element.style.background = pathKeys.has(key)
-                ? "color-mix(in srgb, var(--path-color) 42%, transparent)"
-                : "var(--tile-background)";
+        const thickness = `${traceWidthRatio * 100}%`;
+
+        activePath.forEach((position, index) => {
+            const element = elements.get(positionKey(position));
+            const connected = [
+                activePath[index - 1],
+                activePath[index + 1]
+            ].filter(Boolean);
+
+            if (connected.length === 0) {
+                connected.push(position);
+            }
+
+            for (const neighbor of connected) {
+                const segment = document.createElement("div");
+                const rowChange = neighbor.row - position.row;
+                const colChange = neighbor.col - position.col;
+                segment.className = "maze-v2-trace-segment";
+                segment.style.position = "absolute";
+                segment.style.zIndex = "1";
+                segment.style.background = "var(--path-color)";
+                segment.style.pointerEvents = "none";
+
+                if (rowChange === 0 && colChange === 0) {
+                    segment.style.width = thickness;
+                    segment.style.height = thickness;
+                    segment.style.left = "50%";
+                    segment.style.top = "50%";
+                    segment.style.transform = "translate(-50%, -50%)";
+                } else if (rowChange === 0) {
+                    segment.style.height = thickness;
+                    segment.style.width = colChange === 0 ? thickness : "51%";
+                    segment.style.top = "50%";
+                    segment.style.transform = "translateY(-50%)";
+                    segment.style.left = colChange < 0 ? "0" : "49%";
+                } else {
+                    segment.style.width = thickness;
+                    segment.style.height = "51%";
+                    segment.style.left = "50%";
+                    segment.style.transform = "translateX(-50%)";
+                    segment.style.top = rowChange < 0 ? "0" : "49%";
+                }
+
+                element.appendChild(segment);
+            }
         });
     }
 
-    function resetAttempt() {
+    function resetToStart() {
         activePath = [];
+        isTracing = false;
+        completed = false;
+        checkpointActivated = false;
+        checkpointPath = [];
+        renderPath();
+    }
+
+    function resetToCheckpoint() {
+        activePath = checkpointPath.map(position => ({ ...position }));
         isTracing = false;
         completed = false;
         renderPath();
@@ -377,7 +483,9 @@ function renderMazeV2Preview(
         if (
             previous &&
             previous.row === position.row &&
-            previous.col === position.col
+            previous.col === position.col &&
+            (!checkpointActivated ||
+                activePath.length > checkpointPath.length)
         ) {
             activePath.pop();
             renderPath();
@@ -394,6 +502,16 @@ function renderMazeV2Preview(
         }
 
         activePath.push(position);
+
+        if (
+            !checkpointActivated &&
+            position.row === maze.checkpoint.row &&
+            position.col === maze.checkpoint.col
+        ) {
+            checkpointActivated = true;
+            checkpointPath = activePath.map(item => ({ ...item }));
+        }
+
         renderPath();
 
         if (
@@ -408,17 +526,21 @@ function renderMazeV2Preview(
     function handlePointerDown(event) {
         const position = positionFromPointer(event);
 
-        if (
-            !position ||
-            position.row !== maze.start.row ||
-            position.col !== maze.start.col
-        ) {
+        const requiredOrigin = checkpointActivated
+            ? maze.checkpoint
+            : maze.start;
+
+        if (!position ||
+            position.row !== requiredOrigin.row ||
+            position.col !== requiredOrigin.col) {
             return;
         }
 
         event.preventDefault();
         boardElement.setPointerCapture?.(event.pointerId);
-        activePath = [{ ...position }];
+        activePath = checkpointActivated
+            ? checkpointPath.map(item => ({ ...item }))
+            : [{ ...position }];
         isTracing = true;
         completed = false;
         renderPath();
@@ -435,17 +557,36 @@ function renderMazeV2Preview(
 
     function handlePointerEnd() {
         if (isTracing && !completed) {
-            resetAttempt();
+            if (checkpointActivated) {
+                resetToCheckpoint();
+            } else {
+                resetToStart();
+            }
         }
+    }
+
+    function handleRestart(event) {
+        if (
+            boardElement.dataset.mazeV2 !== "true" ||
+            !boardElement.querySelector(".maze-v2-cell")
+        ) {
+            return;
+        }
+
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        resetToStart();
     }
 
     boardElement.addEventListener("pointerdown", handlePointerDown);
     boardElement.addEventListener("pointermove", handlePointerMove);
     boardElement.addEventListener("pointerup", handlePointerEnd);
     boardElement.addEventListener("pointercancel", handlePointerEnd);
+    const restartButton = document.querySelector(".restart-button");
+    restartButton?.addEventListener("click", handleRestart, true);
 
     const controller = {
-        reset: resetAttempt,
+        reset: resetToStart,
         destroy() {
             boardElement.removeEventListener(
                 "pointerdown",
@@ -462,6 +603,11 @@ function renderMazeV2Preview(
             boardElement.removeEventListener(
                 "pointercancel",
                 handlePointerEnd
+            );
+            restartButton?.removeEventListener(
+                "click",
+                handleRestart,
+                true
             );
             delete boardElement.dataset.mazeV2;
         }

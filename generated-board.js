@@ -261,7 +261,11 @@ function loadMazeV2Preview() {
         columns: candidate.cols,
         start: candidate.start,
         goal: candidate.goal,
+        "checkpoint position": candidate.checkpoint,
+        "checkpoint path index": candidate.checkpointPathIndex,
         "solution length": candidate.solutionLength,
+        "trace width": MAZE_V2_TRACE_WIDTH_RATIO,
+        "touch tolerance": MAZE_V2_TOUCH_TOLERANCE,
         "generation work": candidate.generationWork
     });
 
