@@ -326,3 +326,10 @@ function regenerateGeneratedPreview() {
         currentGeneratedPreviewDifficulty
     );
 }
+
+// Temporary development-only Maze V2 launcher.
+document
+    .querySelector("#maze-v2-preview-button")
+    ?.addEventListener("click", () => {
+        loadMazeV2Preview();
+    });
