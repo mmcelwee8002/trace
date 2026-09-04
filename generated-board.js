@@ -198,6 +198,76 @@ function loadMazePreview() {
     return candidate;
 }
 
+function loadMazeV2Preview() {
+    const candidate = createMazeV2Candidate(12, 12);
+
+    if (!candidate) {
+        console.error("Maze V2 preview generation failed");
+        return null;
+    }
+
+    const solution = solveMazeV2ShortestPath(
+        candidate,
+        candidate.start,
+        candidate.goal
+    );
+
+    if (
+        !solution ||
+        solution.length - 1 !== candidate.solutionLength
+    ) {
+        console.error("Maze V2 preview validation failed");
+        return null;
+    }
+
+    const boardElement = document.querySelector(".game-board");
+    const controller = renderMazeV2Preview(
+        candidate,
+        boardElement,
+        MAZE_V2_TOUCH_TOLERANCE
+    );
+
+    if (!controller) {
+        console.error("Maze V2 preview rendering failed");
+        return null;
+    }
+
+    const titleElement = document.querySelector(".level-title");
+    const numberElement = document.querySelector(".level-number");
+    const gameMessage = document.querySelector(".game-message");
+    const levelMessage = document.querySelector(".level-message");
+
+    if (titleElement) {
+        titleElement.textContent = candidate.title;
+    }
+
+    if (numberElement) {
+        numberElement.textContent = "Experimental Preview";
+    }
+
+    if (gameMessage) {
+        gameMessage.textContent =
+            "Trace from the circle to the star without crossing a wall.";
+    }
+
+    if (levelMessage) {
+        levelMessage.textContent = "";
+    }
+
+    window.currentMazeV2Preview = candidate;
+
+    console.log("Maze V2 preview", {
+        rows: candidate.rows,
+        columns: candidate.cols,
+        start: candidate.start,
+        goal: candidate.goal,
+        "solution length": candidate.solutionLength,
+        "generation work": candidate.generationWork
+    });
+
+    return candidate;
+}
+
 function exportCurrentMazeCandidate() {
     const candidate = window.currentGeneratedPreview;
 
