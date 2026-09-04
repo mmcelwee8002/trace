@@ -328,8 +328,51 @@ function regenerateGeneratedPreview() {
 }
 
 // Temporary development-only Maze V2 launcher.
-document
-    .querySelector("#maze-v2-preview-button")
-    ?.addEventListener("click", () => {
-        loadMazeV2Preview();
+function attachMazeV2PreviewButton() {
+    const button = document.querySelector("#maze-v2-preview-button");
+    const status = document.querySelector("#maze-v2-preview-status");
+
+    if (!button || button.dataset.mazeV2ListenerAttached === "true") {
+        return;
+    }
+
+    button.dataset.mazeV2ListenerAttached = "true";
+    button.addEventListener("click", () => {
+        if (status) {
+            status.textContent = "Loading Maze V2...";
+        }
+
+        window.setTimeout(() => {
+            if (typeof loadMazeV2Preview !== "function") {
+                if (status) {
+                    status.textContent = "Maze V2 function unavailable";
+                }
+                return;
+            }
+
+            let candidate = null;
+
+            try {
+                candidate = loadMazeV2Preview();
+            } catch (error) {
+                console.error("Maze V2 preview button failed", error);
+            }
+
+            if (status) {
+                status.textContent = candidate
+                    ? "Maze V2 loaded"
+                    : "Maze V2 failed to load";
+            }
+        }, 0);
     });
+}
+
+if (document.readyState === "loading") {
+    document.addEventListener(
+        "DOMContentLoaded",
+        attachMazeV2PreviewButton,
+        { once: true }
+    );
+} else {
+    attachMazeV2PreviewButton();
+}
