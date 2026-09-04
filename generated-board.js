@@ -198,6 +198,52 @@ function loadMazePreview() {
     return candidate;
 }
 
+function exportCurrentMazeCandidate() {
+    const candidate = window.currentGeneratedPreview;
+
+    if (
+        window.currentGeneratedPreviewDifficulty !== "maze" ||
+        !candidate ||
+        candidate.size !== 15 ||
+        !Array.isArray(candidate.walls)
+    ) {
+        console.error(
+            "Maze export failed: no current maze preview is available"
+        );
+        return null;
+    }
+
+    const authoredMaze = {
+        id: "2-07",
+        title: candidate.title || "Generated Maze",
+        instructions: "Start at the circle. Then reach the star.",
+        size: candidate.size,
+        start: [...candidate.start],
+        goal: [...candidate.goal],
+        walls: candidate.walls.map(wall => [...wall]),
+        keys: [],
+        lockGroups: [],
+        switches: [],
+        switchGates: [],
+        requiredArrows: [],
+        oneWays: []
+    };
+    const normalized = normalizeLevel(authoredMaze);
+    const optimal = findShortestPathLength(normalized);
+    const exportData = {
+        authoredMaze,
+        optimal
+    };
+
+    window.currentMazeAuthoredExport = exportData;
+    console.log(
+        "Maze authored export:",
+        JSON.stringify(exportData, null, 2)
+    );
+
+    return exportData;
+}
+
 function regenerateGeneratedPreview() {
     if (!currentGeneratedPreviewDifficulty) {
         console.error(
