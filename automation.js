@@ -49,6 +49,18 @@ const difficultyProfiles = {
     }
 };
 
+const experimentalOpenBoardProfiles = {
+    easy: { targetWalkableFraction: 0.40 },
+    medium: { targetWalkableFraction: 0.55 },
+    hard: {
+        targetWalkableFraction: 0.65,
+        keys: 1,
+        switches: 0,
+        arrows: 1
+    },
+    extreme: { targetWalkableFraction: 0.75 }
+};
+
 function getNeighbors(row, col, size) {
     const neighbors = [
         [row - 1, col],
@@ -2072,6 +2084,1012 @@ function openCandidateSpace(
     );
 
     return result;
+}
+
+function createOpenBoardBase(candidate, options = {}) {
+    if (!candidate?.path || !candidate?.walls) {
+        return null;
+    }
+
+    const {
+        targetWalkableFraction = 0.55,
+        minimumOptimalRatio = 0.65,
+        maxRegionProposals = 12,
+        minRegionSize = 6,
+        maxRegionSize = 14
+    } = options;
+
+    if (
+        typeof targetWalkableFraction !== "number" ||
+        targetWalkableFraction < 0 ||
+        targetWalkableFraction > 1 ||
+        typeof minimumOptimalRatio !== "number" ||
+        minimumOptimalRatio < 0 ||
+        minimumOptimalRatio > 1 ||
+        !Number.isInteger(maxRegionProposals) ||
+        maxRegionProposals < 1 ||
+        !Number.isInteger(minRegionSize) ||
+        !Number.isInteger(maxRegionSize) ||
+        minRegionSize < 1 ||
+        maxRegionSize < minRegionSize
+    ) {
+        return null;
+    }
+
+    const updated = structuredClone(candidate);
+    const referenceWalls = candidate.walls.map(wall => [...wall]);
+    const referencePathLength = candidate.path.length - 1;
+    const minimumOptimal = Math.floor(
+        referencePathLength * minimumOptimalRatio
+    );
+    const boardTileCount = updated.size * updated.size;
+    const targetWalkableCount = Math.ceil(
+        boardTileCount * targetWalkableFraction
+    );
+    const coordinateKey = ([row, col]) => `${row},${col}`;
+    const triedRegions = new Set();
+    let proposalsTried = 0;
+    let proposalsAccepted = 0;
+    let solverNullRejections = 0;
+    let optimalRejections = 0;
+
+    function shuffled(values) {
+        const result = [...values];
+
+        for (let index = result.length - 1; index > 0; index--) {
+            const randomIndex = Math.floor(
+                Math.random() * (index + 1)
+            );
+            [result[index], result[randomIndex]] =
+                [result[randomIndex], result[index]];
+        }
+
+        return result;
+    }
+
+    while (
+        boardTileCount - updated.walls.length < targetWalkableCount &&
+        proposalsTried < maxRegionProposals
+    ) {
+        const wallKeys = new Set(updated.walls.map(coordinateKey));
+        const frontier = updated.walls.filter(position =>
+            getNeighbors(
+                position[0],
+                position[1],
+                updated.size
+            ).some(neighbor => !wallKeys.has(coordinateKey(neighbor)))
+        );
+
+        if (frontier.length === 0) {
+            break;
+        }
+
+        const seed = frontier[
+            Math.floor(Math.random() * frontier.length)
+        ];
+        const remainingNeeded =
+            targetWalkableCount -
+            (boardTileCount - updated.walls.length);
+        const sizeRange = maxRegionSize - minRegionSize + 1;
+        const desiredSize = Math.min(
+            remainingNeeded,
+            minRegionSize + Math.floor(Math.random() * sizeRange)
+        );
+        const region = [[...seed]];
+        const regionKeys = new Set([coordinateKey(seed)]);
+
+        while (region.length < desiredSize) {
+            const growthCandidates = shuffled(
+                region.flatMap(position =>
+                    getNeighbors(
+                        position[0],
+                        position[1],
+                        updated.size
+                    )
+                )
+            ).filter(position => {
+                const key = coordinateKey(position);
+                return wallKeys.has(key) && !regionKeys.has(key);
+            });
+
+            if (growthCandidates.length === 0) {
+                break;
+            }
+
+            const next = growthCandidates[0];
+            region.push([...next]);
+            regionKeys.add(coordinateKey(next));
+        }
+
+        const regionKey = [...regionKeys].sort().join("|");
+        proposalsTried++;
+
+        if (triedRegions.has(regionKey)) {
+            continue;
+        }
+
+        triedRegions.add(regionKey);
+
+        const trial = structuredClone(updated);
+        trial.walls = trial.walls.filter(
+            wall => !regionKeys.has(coordinateKey(wall))
+        );
+
+        const optimal = findShortestPathLength(
+            normalizeGeneratedCandidate(trial)
+        );
+
+        if (optimal === null) {
+            solverNullRejections++;
+            continue;
+        }
+
+        if (optimal < minimumOptimal) {
+            optimalRejections++;
+            continue;
+        }
+
+        updated.walls = trial.walls;
+        proposalsAccepted++;
+    }
+
+    const finalOptimal = findShortestPathLength(
+        normalizeGeneratedCandidate(updated)
+    );
+
+    if (finalOptimal === null || finalOptimal < minimumOptimal) {
+        return null;
+    }
+
+    updated.referencePathLength = referencePathLength;
+    updated.referenceWalls = referenceWalls;
+    updated.minimumOptimalRatio = minimumOptimalRatio;
+    updated.minimumOptimal = minimumOptimal;
+    updated.finalOptimal = finalOptimal;
+    updated.openBoardWork = {
+        targetWalkableFraction,
+        achievedWalkableFraction:
+            (boardTileCount - updated.walls.length) / boardTileCount,
+        proposalsTried,
+        proposalsAccepted,
+        solverNullRejections,
+        optimalRejections
+    };
+
+    return updated;
+}
+
+function addMechanicsToOpenBoardCandidate(
+    candidate,
+    options = {}
+) {
+    const work = {
+        proposals: 0,
+        solverCalls: 0,
+        keyValidations: 0,
+        switchValidations: 0,
+        arrowValidations: 0,
+        result: "fail"
+    };
+    addMechanicsToOpenBoardCandidate.lastWork = work;
+
+    if (!candidate?.path || !candidate?.referenceWalls) {
+        return null;
+    }
+
+    const {
+        keys = 0,
+        switches = 0,
+        arrows = 0,
+        maxPlacementProposals = 6,
+        placementAttemptsPerProposal = 3,
+        useBoundedStructuralPlacement = false
+    } = options;
+
+    if (
+        !Number.isInteger(maxPlacementProposals) ||
+        maxPlacementProposals < 1 ||
+        !Number.isInteger(placementAttemptsPerProposal) ||
+        placementAttemptsPerProposal < 1
+    ) {
+        return null;
+    }
+
+    const path = candidate.path;
+    const coordinateKey = ([row, col]) => `${row},${col}`;
+    const wallKeys = new Set(candidate.walls.map(coordinateKey));
+    const reachabilityCache = new Map();
+    const randomIndex = (minimum, maximum) =>
+        minimum + Math.floor(
+            Math.random() * (maximum - minimum + 1)
+        );
+
+    function canReach(from, to, blockedPositions = []) {
+        const blockedKeys = new Set(
+            blockedPositions.map(coordinateKey)
+        );
+        const startKey = coordinateKey(from);
+        const targetKey = coordinateKey(to);
+        const cacheKey = `${startKey}>${targetKey}|${
+            [...blockedKeys].sort().join(";")
+        }`;
+
+        if (reachabilityCache.has(cacheKey)) {
+            return reachabilityCache.get(cacheKey);
+        }
+
+        if (blockedKeys.has(startKey) || blockedKeys.has(targetKey)) {
+            reachabilityCache.set(cacheKey, false);
+            return false;
+        }
+
+        const queue = [[...from]];
+        const visited = new Set([startKey]);
+
+        for (let index = 0; index < queue.length; index++) {
+            const current = queue[index];
+
+            if (coordinateKey(current) === targetKey) {
+                reachabilityCache.set(cacheKey, true);
+                return true;
+            }
+
+            for (const neighbor of getNeighbors(
+                current[0],
+                current[1],
+                candidate.size
+            )) {
+                const key = coordinateKey(neighbor);
+
+                if (
+                    wallKeys.has(key) ||
+                    blockedKeys.has(key) ||
+                    visited.has(key)
+                ) {
+                    continue;
+                }
+
+                visited.add(key);
+                queue.push(neighbor);
+            }
+        }
+
+        reachabilityCache.set(cacheKey, false);
+        return false;
+    }
+
+    let cachedChokepointIndexes = null;
+
+    function createTopologyKeyPairs(count) {
+        if (count === 0) {
+            return { pairs: [], rejection: null };
+        }
+
+        if (cachedChokepointIndexes === null) {
+            cachedChokepointIndexes = [];
+            const maxChokepointCandidates = 15;
+            const structurallyLikelyIndexes = [];
+
+            for (let index = 3; index < path.length - 2; index++) {
+                const walkableDegree = getNeighbors(
+                    path[index][0],
+                    path[index][1],
+                    candidate.size
+                ).filter(neighbor =>
+                    !wallKeys.has(coordinateKey(neighbor))
+                ).length;
+
+                if (walkableDegree <= 3) {
+                    structurallyLikelyIndexes.push({
+                        index,
+                        walkableDegree,
+                        tieBreaker: Math.random()
+                    });
+                }
+            }
+
+            structurallyLikelyIndexes.sort((first, second) =>
+                first.walkableDegree - second.walkableDegree ||
+                first.tieBreaker - second.tieBreaker
+            );
+            const indexesToTest = structurallyLikelyIndexes
+                .slice(0, maxChokepointCandidates)
+                .map(item => item.index);
+
+            for (const index of indexesToTest) {
+                if (
+                    !canReach(
+                        candidate.start,
+                        candidate.goal,
+                        [path[index]]
+                    )
+                ) {
+                    cachedChokepointIndexes.push(index);
+                }
+            }
+
+            console.log("Chokepoint analysis:", {
+                "candidates considered":
+                    structurallyLikelyIndexes.length,
+                "candidates tested": indexesToTest.length,
+                "valid chokepoints":
+                    cachedChokepointIndexes.length,
+                "work limit reached":
+                    structurallyLikelyIndexes.length >
+                    maxChokepointCandidates
+            });
+        }
+
+        const chokepointIndexes = cachedChokepointIndexes;
+
+        if (chokepointIndexes.length < count) {
+            return { pairs: null, rejection: "no chokepoint found" };
+        }
+
+        const shuffledChokepoints = [...chokepointIndexes]
+            .sort(() => Math.random() - 0.5);
+
+        if (count === 1) {
+            const maxKeyPositionCandidates = 8;
+
+            for (const gateIndex of shuffledChokepoints.slice(
+                0,
+                maxKeyPositionCandidates
+            )) {
+                const keyIndex = Math.max(2, gateIndex - 2);
+
+                if (
+                    canReach(
+                        candidate.start,
+                        path[keyIndex],
+                        [path[gateIndex]]
+                    )
+                ) {
+                    return {
+                        pairs: [{
+                            id: "A",
+                            sourceIndex: keyIndex,
+                            gateIndex
+                        }],
+                        rejection: null
+                    };
+                }
+            }
+
+            return {
+                pairs: null,
+                rejection: "key not reachable before gate"
+            };
+        }
+
+        let gatePairsTested = 0;
+        const maxGatePairs = 15;
+
+        for (const firstGate of shuffledChokepoints) {
+            const laterGates = shuffledChokepoints.filter(
+                index => index >= firstGate + 3
+            );
+
+            for (const secondGate of laterGates) {
+                if (gatePairsTested >= maxGatePairs) {
+                    return {
+                        pairs: null,
+                        rejection: "key not reachable before gate"
+                    };
+                }
+
+                gatePairsTested++;
+                const blockedGates = [path[firstGate], path[secondGate]];
+                const firstKeyIndex = Math.max(2, firstGate - 2);
+                const secondKeyIndexes = [
+                    firstGate + 1,
+                    Math.floor((firstGate + secondGate) / 2),
+                    secondGate - 1
+                ].filter((index, position, values) =>
+                    index > firstGate &&
+                    index < secondGate &&
+                    values.indexOf(index) === position
+                );
+
+                if (
+                    !canReach(
+                        candidate.start,
+                        path[firstKeyIndex],
+                        blockedGates
+                    )
+                ) {
+                    continue;
+                }
+
+                for (const secondKeyIndex of secondKeyIndexes) {
+                    const reachableAfterFirstGate = canReach(
+                        candidate.start,
+                        path[secondKeyIndex],
+                        [path[secondGate]]
+                    );
+                    const reachableBeforeFirstGate = canReach(
+                        candidate.start,
+                        path[secondKeyIndex],
+                        blockedGates
+                    );
+
+                    if (
+                        reachableAfterFirstGate &&
+                        !reachableBeforeFirstGate
+                    ) {
+                        return {
+                            pairs: [
+                                {
+                                    id: "A",
+                                    sourceIndex: firstKeyIndex,
+                                    gateIndex: firstGate
+                                },
+                                {
+                                    id: "B",
+                                    sourceIndex: secondKeyIndex,
+                                    gateIndex: secondGate
+                                }
+                            ],
+                            rejection: null
+                        };
+                    }
+                }
+            }
+        }
+
+        return {
+            pairs: null,
+            rejection: "key not reachable before gate"
+        };
+    }
+
+    function describeKeyRejection(trial) {
+        for (const group of trial.lockGroups ?? []) {
+            if (
+                canReach(
+                    trial.start,
+                    trial.goal,
+                    group.tiles
+                )
+            ) {
+                return `${group.keyId} bypassable`;
+            }
+        }
+
+        for (const key of trial.keys ?? []) {
+            const group = (trial.lockGroups ?? []).find(
+                item => item.keyId === key.id
+            );
+
+            if (
+                !group ||
+                !canReach(trial.start, key.position, group.tiles)
+            ) {
+                return "key not reachable before gate";
+            }
+        }
+
+        return "independent key requirement failed";
+    }
+
+    function createTopologySwitchPairs(count, excludedIndexes) {
+        if (count !== 1) {
+            return {
+                pairs: createOrderedPairSet(count, "switch"),
+                rejection: null
+            };
+        }
+
+        const availableChokepoints = (
+            cachedChokepointIndexes ?? []
+        ).filter(index => !excludedIndexes.has(index));
+
+        if (availableChokepoints.length === 0) {
+            return {
+                pairs: null,
+                rejection: "no downstream chokepoint"
+            };
+        }
+
+        for (const gateIndex of availableChokepoints
+            .sort(() => Math.random() - 0.5)) {
+            const sourceCandidates = [
+                gateIndex - 2,
+                Math.floor(gateIndex / 2),
+                2
+            ].filter((index, position, values) =>
+                index >= 2 &&
+                index < gateIndex &&
+                !excludedIndexes.has(index) &&
+                values.indexOf(index) === position
+            );
+
+            for (const sourceIndex of sourceCandidates) {
+                if (
+                    canReach(
+                        candidate.start,
+                        path[sourceIndex],
+                        [path[gateIndex]]
+                    )
+                ) {
+                    return {
+                        pairs: [{
+                            id: "S1",
+                            sourceIndex,
+                            gateIndex
+                        }],
+                        rejection: null
+                    };
+                }
+            }
+        }
+
+        return {
+            pairs: null,
+            rejection: "switch not reachable before gate"
+        };
+    }
+
+    function describeSwitchRejection(trial) {
+        const group = trial.switchGates?.[0];
+        const gameSwitch = trial.switches?.[0];
+
+        if (!group || !gameSwitch) {
+            return "independent switch requirement failed";
+        }
+
+        if (canReach(trial.start, trial.goal, group.tiles)) {
+            return "gate bypassable";
+        }
+
+        if (!canReach(trial.start, gameSwitch.position, group.tiles)) {
+            return "switch not reachable before gate";
+        }
+
+        return "independent switch requirement failed";
+    }
+
+    function createOrderedPairSet(count, prefix) {
+        if (count === 0) {
+            return [];
+        }
+
+        if (count === 1) {
+            const sourceIndex = randomIndex(
+                2,
+                Math.floor(path.length * 0.45)
+            );
+            const gateIndex = randomIndex(
+                sourceIndex + 3,
+                path.length - 2
+            );
+            return [{
+                id: prefix === "key" ? "A" : "S1",
+                sourceIndex,
+                gateIndex
+            }];
+        }
+
+        const firstSource = randomIndex(
+            2,
+            Math.max(2, Math.floor(path.length * 0.25))
+        );
+        const firstGate = randomIndex(
+            firstSource + 3,
+            Math.floor(path.length * 0.5)
+        );
+        const secondSource = randomIndex(
+            firstGate + 2,
+            Math.floor(path.length * 0.7)
+        );
+        const secondGate = randomIndex(
+            secondSource + 3,
+            path.length - 2
+        );
+
+        return [
+            {
+                id: prefix === "key" ? "A" : "S1",
+                sourceIndex: firstSource,
+                gateIndex: firstGate
+            },
+            {
+                id: prefix === "key" ? "B" : "S2",
+                sourceIndex: secondSource,
+                gateIndex: secondGate
+            }
+        ];
+    }
+
+    function createStructuralProposal() {
+        const maxStructuralPlacementAttempts = 10;
+
+        for (
+            let attempt = 0;
+            attempt < maxStructuralPlacementAttempts;
+            attempt++
+        ) {
+            console.log("Stage: key proposal start");
+            const keyPlacement = createTopologyKeyPairs(keys);
+            console.log("Stage: key proposal complete");
+
+            if (!keyPlacement.pairs) {
+                return keyPlacement;
+            }
+
+            const keyPairs = keyPlacement.pairs;
+            const keyIndexes = new Set(
+                keyPairs.flatMap(pair => [
+                    pair.sourceIndex,
+                    pair.gateIndex
+                ])
+            );
+            const switchPlacement = switches === 0
+                ? { pairs: [], rejection: null }
+                : createTopologySwitchPairs(
+                    switches,
+                    keyIndexes
+                );
+
+            if (!switchPlacement.pairs) {
+                return {
+                    proposal: null,
+                    rejection: switchPlacement.rejection,
+                    rejectionType: "switch"
+                };
+            }
+
+            const switchPairs = switchPlacement.pairs;
+            const occupiedIndexes = new Set();
+            const allPairs = [...keyPairs, ...switchPairs];
+            let hasConflict = false;
+
+            for (const pair of allPairs) {
+                if (
+                    occupiedIndexes.has(pair.sourceIndex) ||
+                    occupiedIndexes.has(pair.gateIndex)
+                ) {
+                    hasConflict = true;
+                    break;
+                }
+
+                occupiedIndexes.add(pair.sourceIndex);
+                occupiedIndexes.add(pair.gateIndex);
+            }
+
+            if (hasConflict) {
+                continue;
+            }
+
+            let arrowIndex = null;
+
+            if (arrows > 0) {
+                console.log("Stage: arrow placement start");
+                const arrowCandidates = [];
+                const maxArrowPositionCandidates = 12;
+
+                for (let index = 2; index < path.length - 2; index++) {
+                    if (!occupiedIndexes.has(index)) {
+                        arrowCandidates.push(index);
+
+                        if (
+                            arrowCandidates.length >=
+                            maxArrowPositionCandidates
+                        ) {
+                            break;
+                        }
+                    }
+                }
+
+                if (arrowCandidates.length === 0) {
+                    console.log("Stage: arrow placement complete");
+                    continue;
+                }
+
+                arrowIndex = arrowCandidates[
+                    Math.floor(Math.random() * arrowCandidates.length)
+                ];
+                console.log("Stage: arrow placement complete");
+            }
+
+            const proposal = structuredClone(candidate);
+            proposal.keys = keyPairs.map(pair => ({
+                id: pair.id,
+                position: [...path[pair.sourceIndex]]
+            }));
+            proposal.lockGroups = keyPairs.map(pair => ({
+                keyId: pair.id,
+                tiles: [[...path[pair.gateIndex]]]
+            }));
+            proposal.switches = switchPairs.map(pair => ({
+                id: pair.id,
+                position: [...path[pair.sourceIndex]]
+            }));
+            proposal.switchGates = switchPairs.map(pair => ({
+                switchId: pair.id,
+                tiles: [[...path[pair.gateIndex]]]
+            }));
+            proposal.requiredArrows = [];
+
+            if (arrowIndex !== null) {
+                const current = path[arrowIndex];
+                const next = path[arrowIndex + 1];
+                const rowChange = next[0] - current[0];
+                const colChange = next[1] - current[1];
+                const direction = rowChange === -1
+                    ? "up"
+                    : rowChange === 1
+                        ? "down"
+                        : colChange === -1
+                            ? "left"
+                            : "right";
+                proposal.requiredArrows = [{
+                    position: [...current],
+                    direction
+                }];
+            }
+
+            return {
+                proposal,
+                rejection: null,
+                rejectionType: null
+            };
+        }
+
+        return { proposal: null, rejection: "key not reachable before gate" };
+    }
+
+    function runWithCountedSolver(callback) {
+        const originalSolver = findShortestPathLength;
+
+        findShortestPathLength = (...args) => {
+            work.solverCalls++;
+            return originalSolver(...args);
+        };
+
+        try {
+            return callback();
+        } finally {
+            findShortestPathLength = originalSolver;
+        }
+    }
+
+    if (!useBoundedStructuralPlacement) {
+        for (
+            let proposal = 1;
+            proposal <= maxPlacementProposals;
+            proposal++
+        ) {
+            work.proposals++;
+            const placementGuide = structuredClone(candidate);
+            placementGuide.walls = candidate.referenceWalls.map(
+                wall => [...wall]
+            );
+            const placed = runWithCountedSolver(() =>
+                addMechanicsToCandidate(
+                    placementGuide,
+                    { keys, switches, arrows },
+                    placementAttemptsPerProposal
+                )
+            );
+
+            if (!placed) {
+                continue;
+            }
+
+            const trial = structuredClone(candidate);
+            trial.keys = structuredClone(placed.keys ?? []);
+            trial.lockGroups = structuredClone(
+                placed.lockGroups ?? []
+            );
+            trial.switches = structuredClone(placed.switches ?? []);
+            trial.switchGates = structuredClone(
+                placed.switchGates ?? []
+            );
+            trial.requiredArrows = structuredClone(
+                placed.requiredArrows ?? []
+            );
+            const validation = runWithCountedSolver(() => {
+                const optimal = findShortestPathLength(
+                    normalizeGeneratedCandidate(trial)
+                );
+
+                if (
+                    optimal === null ||
+                    optimal < trial.minimumOptimal
+                ) {
+                    return { valid: false, optimal };
+                }
+
+                work.keyValidations += keys > 0 ? 1 : 0;
+                work.switchValidations += switches > 0 ? 1 : 0;
+                work.arrowValidations += arrows > 0 ? 1 : 0;
+                return {
+                    valid: validateGeneratedMechanics(trial),
+                    optimal
+                };
+            });
+
+            if (!validation.valid) {
+                continue;
+            }
+
+            trial.finalOptimal = validation.optimal;
+            work.result = "success";
+            trial.mechanicPlacementWork = { ...work };
+            return trial;
+        }
+
+        return null;
+    }
+
+    for (
+        let proposal = 1;
+        proposal <= maxPlacementProposals;
+        proposal++
+    ) {
+        work.proposals++;
+        const structuralResult = createStructuralProposal();
+        const trial = structuralResult.proposal;
+
+        if (!trial) {
+            console.log(
+                structuralResult.rejectionType === "switch"
+                    ? "Switch placement rejection:"
+                    : "Key placement rejection:",
+                structuralResult.rejection
+            );
+            continue;
+        }
+
+        console.log("Stage: final validation start");
+        const validation = runWithCountedSolver(() => {
+            const optimal = findShortestPathLength(
+                normalizeGeneratedCandidate(trial)
+            );
+
+            if (optimal === null || optimal < trial.minimumOptimal) {
+                return { valid: false, optimal };
+            }
+
+            if (keys > 0) {
+                work.keyValidations++;
+
+                if (
+                    !(keys === 1
+                        ? validateRequiredKey(trial)
+                        : validateRequiredKeyGroups(trial))
+                ) {
+                    console.log(
+                        "Key placement rejection:",
+                        describeKeyRejection(trial)
+                    );
+                    return { valid: false, optimal };
+                }
+            }
+
+            if (switches > 0) {
+                work.switchValidations++;
+
+                if (
+                    !(switches === 1
+                        ? validateRequiredSwitch(trial)
+                        : validateRequiredSwitchGroups(trial))
+                ) {
+                    console.log(
+                        "Switch placement rejection:",
+                        describeSwitchRejection(trial)
+                    );
+                    return { valid: false, optimal };
+                }
+            }
+
+            if (arrows > 0) {
+                work.arrowValidations++;
+
+                if (!validateRequiredArrow(trial)) {
+                    return { valid: false, optimal };
+                }
+            }
+
+            return { valid: true, optimal };
+        });
+        console.log("Stage: final validation complete");
+
+        if (!validation.valid) {
+            continue;
+        }
+
+        trial.finalOptimal = validation.optimal;
+        work.result = "success";
+        trial.mechanicPlacementWork = { ...work };
+        return trial;
+    }
+
+    return null;
+}
+
+function createOpenBoardCandidateForDifficulty(difficulty) {
+    const emptyMechanicWork = {
+        proposals: 0,
+        solverCalls: 0,
+        keyValidations: 0,
+        switchValidations: 0,
+        arrowValidations: 0,
+        result: "fail"
+    };
+    const logMechanicWork = work => {
+        console.log("Open-board mechanic work:", {
+            proposals: work.proposals,
+            "solver calls": work.solverCalls,
+            "key validations": work.keyValidations,
+            "switch validations": work.switchValidations,
+            "arrow validations": work.arrowValidations,
+            result: work.result
+        });
+    };
+
+    if (
+        !Object.hasOwn(difficultyProfiles, difficulty) ||
+        !Object.hasOwn(experimentalOpenBoardProfiles, difficulty)
+    ) {
+        logMechanicWork(emptyMechanicWork);
+        return null;
+    }
+
+    const profile = difficultyProfiles[difficulty];
+    const openProfile = experimentalOpenBoardProfiles[difficulty];
+    const experimentalMechanicCounts = {
+        keys: Object.hasOwn(openProfile, "keys")
+            ? openProfile.keys
+            : profile.keys,
+        switches: Object.hasOwn(openProfile, "switches")
+            ? openProfile.switches
+            : profile.switches,
+        arrows: Object.hasOwn(openProfile, "arrows")
+            ? openProfile.arrows
+            : profile.arrows
+    };
+    const referenceCandidate = createUniquePathCandidate(
+        profile.targetLength
+    );
+
+    if (!referenceCandidate) {
+        logMechanicWork(emptyMechanicWork);
+        return null;
+    }
+
+    const openBoard = createOpenBoardBase(referenceCandidate, {
+        targetWalkableFraction: openProfile.targetWalkableFraction,
+        minimumOptimalRatio: 0.65
+    });
+
+    if (!openBoard) {
+        logMechanicWork(emptyMechanicWork);
+        return null;
+    }
+
+    const completedCandidate = addMechanicsToOpenBoardCandidate(
+        openBoard,
+        {
+            keys: experimentalMechanicCounts.keys,
+            switches: experimentalMechanicCounts.switches,
+            arrows: experimentalMechanicCounts.arrows,
+            maxPlacementProposals:
+                difficulty === "hard" || difficulty === "extreme"
+                    ? 3
+                    : 6,
+            useBoundedStructuralPlacement:
+                difficulty === "hard" || difficulty === "extreme"
+        }
+    );
+
+    logMechanicWork(
+        addMechanicsToOpenBoardCandidate.lastWork ||
+            emptyMechanicWork
+    );
+
+    return completedCandidate;
 }
 
 // Disabled: experimental aggressive open-space strategy retained only
