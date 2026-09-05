@@ -200,7 +200,7 @@ function loadMazePreview() {
 
 function loadMazeV2Preview(
     mechanicMode = "switch",
-    rows = 11,
+    rows = 10,
     cols = rows
 ) {
     const candidate = createMazeV2Candidate(rows, cols, {
@@ -375,7 +375,7 @@ function attachMazeV2PreviewButton() {
             let candidate = null;
 
             try {
-                candidate = loadMazeV2Preview("switch", 9, 9);
+                candidate = loadMazeV2Preview("switch");
             } catch (error) {
                 console.error("Maze V2 preview button failed", error);
             }
