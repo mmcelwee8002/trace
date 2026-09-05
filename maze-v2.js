@@ -1,5 +1,5 @@
 const MAZE_V2_TOUCH_TOLERANCE = 1.2;
-const MAZE_V2_TRACE_WIDTH_RATIO = 0.5;
+const MAZE_V2_TRACE_WIDTH_RATIO = 0.43;
 const MAZE_V2_WALL_WIDTH = "2px";
 
 function createMazeV2Candidate(rows = 12, cols = 12) {
@@ -297,9 +297,9 @@ function renderMazeV2Preview(
         `repeat(${maze.rows}, minmax(0, 1fr))`;
     boardElement.style.gap = "0";
     boardElement.style.padding = "10px";
+    boardElement.style.position = "relative";
+    boardElement.style.background = "var(--maze-v2-background)";
 
-    const elements = new Map();
-    const positionKey = position => `${position.row},${position.col}`;
     const effectiveTouchTolerance = Math.min(
         1.5,
         touchTolerance + Math.max(maze.rows, maze.cols, 12) * 0.01 - 0.12
@@ -309,6 +309,32 @@ function renderMazeV2Preview(
     let completed = false;
     let checkpointActivated = false;
     let checkpointPath = [];
+    const svgNamespace = "http://www.w3.org/2000/svg";
+    const traceSvg = document.createElementNS(svgNamespace, "svg");
+    const tracePolyline = document.createElementNS(
+        svgNamespace,
+        "polyline"
+    );
+    const traceDot = document.createElementNS(svgNamespace, "circle");
+    traceSvg.classList.add("maze-v2-trace");
+    traceSvg.setAttribute("viewBox", `0 0 ${maze.cols} ${maze.rows}`);
+    traceSvg.setAttribute("preserveAspectRatio", "none");
+    traceSvg.style.position = "absolute";
+    traceSvg.style.inset = "10px";
+    traceSvg.style.width = "calc(100% - 20px)";
+    traceSvg.style.height = "calc(100% - 20px)";
+    traceSvg.style.pointerEvents = "none";
+    traceSvg.style.zIndex = "1";
+    tracePolyline.setAttribute("fill", "none");
+    tracePolyline.setAttribute("stroke", "var(--maze-v2-trace-color)");
+    tracePolyline.setAttribute("stroke-width", traceWidthRatio);
+    tracePolyline.setAttribute("stroke-linecap", "round");
+    tracePolyline.setAttribute("stroke-linejoin", "round");
+    traceDot.setAttribute("fill", "var(--maze-v2-trace-color)");
+    traceDot.setAttribute("r", traceWidthRatio / 2);
+    traceDot.style.display = "none";
+    traceSvg.append(tracePolyline, traceDot);
+    boardElement.appendChild(traceSvg);
 
     for (let row = 0; row < maze.rows; row++) {
         for (let col = 0; col < maze.cols; col++) {
@@ -321,41 +347,41 @@ function renderMazeV2Preview(
             element.style.position = "relative";
             element.style.display = "grid";
             element.style.placeItems = "center";
-            element.style.background = "var(--tile-background)";
+            element.style.background = "transparent";
             element.style.borderTop = cell.walls.top
-                ? `${MAZE_V2_WALL_WIDTH} solid var(--wall-border)`
+                ? `${MAZE_V2_WALL_WIDTH} solid var(--maze-v2-wall-color)`
                 : `${MAZE_V2_WALL_WIDTH} solid transparent`;
             element.style.borderLeft = cell.walls.left
-                ? `${MAZE_V2_WALL_WIDTH} solid var(--wall-border)`
+                ? `${MAZE_V2_WALL_WIDTH} solid var(--maze-v2-wall-color)`
                 : `${MAZE_V2_WALL_WIDTH} solid transparent`;
             element.style.borderRight =
                 col === maze.cols - 1 && cell.walls.right
-                    ? `${MAZE_V2_WALL_WIDTH} solid var(--wall-border)`
+                    ? `${MAZE_V2_WALL_WIDTH} solid var(--maze-v2-wall-color)`
                     : "0";
             element.style.borderBottom =
                 row === maze.rows - 1 && cell.walls.bottom
-                    ? `${MAZE_V2_WALL_WIDTH} solid var(--wall-border)`
+                    ? `${MAZE_V2_WALL_WIDTH} solid var(--maze-v2-wall-color)`
                     : "0";
 
             if (row === maze.start.row && col === maze.start.col) {
                 element.innerHTML = "<span>&#9679;</span>";
-                element.style.color = "var(--start-background)";
-                element.style.fontSize = "clamp(0.7rem, 3vw, 1.3rem)";
+                element.style.color = "var(--maze-v2-start-color)";
+                element.style.fontSize = "clamp(0.9rem, 4vw, 1.65rem)";
             } else if (row === maze.goal.row && col === maze.goal.col) {
                 element.innerHTML = "<span>&#9733;</span>";
-                element.style.color = "var(--goal-background)";
-                element.style.fontSize = "clamp(0.8rem, 3vw, 1.4rem)";
+                element.style.color = "var(--maze-v2-goal-color)";
+                element.style.fontSize = "clamp(1rem, 4.2vw, 1.75rem)";
             } else if (
                 row === maze.checkpoint.row &&
                 col === maze.checkpoint.col
             ) {
-                element.innerHTML = "<span>&#9671;</span>";
-                element.style.color = "#f59e0b";
-                element.style.fontSize = "clamp(0.65rem, 2.6vw, 1.15rem)";
+                element.innerHTML = "<span>&#9670;</span>";
+                element.style.color = "var(--maze-v2-checkpoint-color)";
+                element.style.fontSize = "clamp(0.9rem, 3.8vw, 1.55rem)";
             }
 
             element.style.fontWeight = "900";
-            element.style.zIndex = "0";
+            element.style.zIndex = "2";
             const marker = element.querySelector("span");
 
             if (marker) {
@@ -363,63 +389,23 @@ function renderMazeV2Preview(
                 marker.style.zIndex = "2";
             }
 
-            elements.set(`${row},${col}`, element);
             boardElement.appendChild(element);
         }
     }
 
     function renderPath() {
-        elements.forEach(element => {
-            element.querySelectorAll(".maze-v2-trace-segment")
-                .forEach(segment => segment.remove());
-        });
+        const points = activePath.map(position =>
+            `${position.col + 0.5},${position.row + 0.5}`
+        );
+        tracePolyline.setAttribute("points", points.join(" "));
 
-        const thickness = `${traceWidthRatio * 100}%`;
-
-        activePath.forEach((position, index) => {
-            const element = elements.get(positionKey(position));
-            const connected = [
-                activePath[index - 1],
-                activePath[index + 1]
-            ].filter(Boolean);
-
-            if (connected.length === 0) {
-                connected.push(position);
-            }
-
-            for (const neighbor of connected) {
-                const segment = document.createElement("div");
-                const rowChange = neighbor.row - position.row;
-                const colChange = neighbor.col - position.col;
-                segment.className = "maze-v2-trace-segment";
-                segment.style.position = "absolute";
-                segment.style.zIndex = "1";
-                segment.style.background = "var(--path-color)";
-                segment.style.pointerEvents = "none";
-
-                if (rowChange === 0 && colChange === 0) {
-                    segment.style.width = thickness;
-                    segment.style.height = thickness;
-                    segment.style.left = "50%";
-                    segment.style.top = "50%";
-                    segment.style.transform = "translate(-50%, -50%)";
-                } else if (rowChange === 0) {
-                    segment.style.height = thickness;
-                    segment.style.width = colChange === 0 ? thickness : "51%";
-                    segment.style.top = "50%";
-                    segment.style.transform = "translateY(-50%)";
-                    segment.style.left = colChange < 0 ? "0" : "49%";
-                } else {
-                    segment.style.width = thickness;
-                    segment.style.height = "51%";
-                    segment.style.left = "50%";
-                    segment.style.transform = "translateX(-50%)";
-                    segment.style.top = rowChange < 0 ? "0" : "49%";
-                }
-
-                element.appendChild(segment);
-            }
-        });
+        if (activePath.length === 1) {
+            traceDot.setAttribute("cx", activePath[0].col + 0.5);
+            traceDot.setAttribute("cy", activePath[0].row + 0.5);
+            traceDot.style.display = "block";
+        } else {
+            traceDot.style.display = "none";
+        }
     }
 
     function resetToStart() {
