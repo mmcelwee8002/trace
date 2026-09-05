@@ -206,13 +206,11 @@ function loadMazeV2Preview() {
         return null;
     }
 
-    const solution = solveMazeV2ShortestPath(
-        candidate,
-        candidate.start,
-        candidate.goal
-    );
+    const mechanicValidation = validateMazeV2KeyAndGate(candidate);
+    const solution = mechanicValidation.solution;
 
     if (
+        !mechanicValidation.valid ||
         !solution ||
         solution.length - 1 !== candidate.solutionLength
     ) {
@@ -247,7 +245,7 @@ function loadMazeV2Preview() {
 
     if (gameMessage) {
         gameMessage.textContent =
-            "Trace from the circle to the star without crossing a wall.";
+            "Collect Key A to open Gate A, then reach the star.";
     }
 
     if (levelMessage) {
@@ -261,9 +259,13 @@ function loadMazeV2Preview() {
         columns: candidate.cols,
         start: candidate.start,
         goal: candidate.goal,
-        "checkpoint position": candidate.checkpoint,
-        "checkpoint path index": candidate.checkpointPathIndex,
+        "key position": candidate.key.position,
+        "gate edge": candidate.gate.between,
+        "key checkpoint active":
+            controller.isKeyCheckpointActive(),
         "solution length": candidate.solutionLength,
+        "final Optimal": candidate.solutionLength,
+        "gate required": mechanicValidation.gateRequired,
         "trace width": MAZE_V2_TRACE_WIDTH_RATIO,
         "touch tolerance": MAZE_V2_TOUCH_TOLERANCE,
         "generation work": candidate.generationWork

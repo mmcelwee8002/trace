@@ -26,8 +26,11 @@
   --maze-v2-wall-color: #111827;
   --maze-v2-trace-color: #38bdf8;
   --maze-v2-start-color: #4ade80;
-  --maze-v2-goal-color: #f8fafc;
+  --maze-v2-goal-color: #c084fc;
   --maze-v2-checkpoint-color: #f59e0b;
+  --maze-v2-key-color: #facc15;
+  --maze-v2-gate-color: #ef4444;
+  --maze-v2-gate-open-color: #4ade80;
   --control-background: #334155;
   --control-hover: #475569;
   --control-disabled: #1e293b;
@@ -60,8 +63,11 @@
   --maze-v2-wall-color: #ffffff;
   --maze-v2-trace-color: #ffff00;
   --maze-v2-start-color: #00cc66;
-  --maze-v2-goal-color: #ffffff;
+  --maze-v2-goal-color: #d8b4fe;
   --maze-v2-checkpoint-color: #ff9900;
+  --maze-v2-key-color: #ffffff;
+  --maze-v2-gate-color: #ff4040;
+  --maze-v2-gate-open-color: #00ff80;
   --control-background: #222222;
   --control-hover: #444444;
   --control-disabled: #111111;
@@ -96,6 +102,9 @@
   --maze-v2-start-color: #2dd4bf;
   --maze-v2-goal-color: #fb923c;
   --maze-v2-checkpoint-color: #facc15;
+  --maze-v2-key-color: #facc15;
+  --maze-v2-gate-color: #f43f5e;
+  --maze-v2-gate-open-color: #2dd4bf;
   --control-background: #354761;
   --control-hover: #4a607d;
   --control-disabled: #202b3c;

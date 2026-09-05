@@ -78,37 +78,7 @@ function createMazeV2Candidate(rows = 12, cols = 12) {
         return null;
     }
 
-    const midpoint = Math.floor(solution.length / 2);
-    let checkpointPathIndex = midpoint;
-    const checkpointSearchRadius = Math.min(8, midpoint - 1);
-
-    for (let offset = 0; offset <= checkpointSearchRadius; offset++) {
-        const indexes = offset === 0
-            ? [midpoint]
-            : [midpoint - offset, midpoint + offset];
-        const intersectionIndex = indexes.find(index => {
-            if (index <= 0 || index >= solution.length - 1) {
-                return false;
-            }
-
-            const cell = cells[
-                solution[index].row
-            ][solution[index].col];
-            const openSides = Object.values(cell.walls)
-                .filter(hasWall => !hasWall)
-                .length;
-            return openSides >= 3;
-        });
-
-        if (intersectionIndex !== undefined) {
-            checkpointPathIndex = intersectionIndex;
-            break;
-        }
-    }
-
-    const checkpoint = { ...solution[checkpointPathIndex] };
-
-    return {
+    const candidate = {
         id: "MAZE-V2-EXPERIMENT",
         title: "Maze V2",
         rows,
@@ -116,10 +86,10 @@ function createMazeV2Candidate(rows = 12, cols = 12) {
         cells,
         start,
         goal,
-        checkpoint,
-        checkpointPathIndex,
-        solutionLength: solution.length - 1,
-        solution,
+        key: null,
+        gate: null,
+        solutionLength: null,
+        solution: null,
         keys: [],
         switches: [],
         gates: [],
@@ -129,9 +99,106 @@ function createMazeV2Candidate(rows = 12, cols = 12) {
             visitedCells: visited.size
         }
     };
+
+    if (!placeMazeV2KeyAndGate(candidate, solution)) {
+        return null;
+    }
+
+    return candidate;
 }
 
-function canMoveBetweenMazeCells(current, destination, maze) {
+function mazeV2PositionsEqual(first, second) {
+    return first?.row === second?.row && first?.col === second?.col;
+}
+
+function isMazeV2GateEdge(current, destination, maze) {
+    if (!maze?.gate?.between) {
+        return false;
+    }
+
+    const [first, second] = maze.gate.between.map(([row, col]) => ({
+        row,
+        col
+    }));
+    return (
+        mazeV2PositionsEqual(current, first) &&
+        mazeV2PositionsEqual(destination, second)
+    ) || (
+        mazeV2PositionsEqual(current, second) &&
+        mazeV2PositionsEqual(destination, first)
+    );
+}
+
+function placeMazeV2KeyAndGate(candidate, route) {
+    const moveCount = route.length - 1;
+    const keyMinimum = Math.max(1, Math.floor(moveCount * 0.35));
+    const keyMaximum = Math.min(
+        route.length - 3,
+        Math.floor(moveCount * 0.5)
+    );
+    const gateMinimum = Math.max(
+        keyMaximum + 1,
+        Math.floor(moveCount * 0.65)
+    );
+    const gateMaximum = Math.min(
+        route.length - 1,
+        Math.floor(moveCount * 0.85)
+    );
+    const gateIndexes = [];
+
+    for (let index = gateMinimum; index <= gateMaximum; index++) {
+        gateIndexes.push(index);
+    }
+
+    for (let index = gateIndexes.length - 1; index > 0; index--) {
+        const swapIndex = Math.floor(Math.random() * (index + 1));
+        [gateIndexes[index], gateIndexes[swapIndex]] =
+            [gateIndexes[swapIndex], gateIndexes[index]];
+    }
+
+    const maxGateChecks = Math.min(12, gateIndexes.length);
+    const keyIndex = keyMinimum + Math.floor(
+        Math.random() * Math.max(1, keyMaximum - keyMinimum + 1)
+    );
+    candidate.key = {
+        id: "A",
+        position: [route[keyIndex].row, route[keyIndex].col]
+    };
+
+    for (let check = 0; check < maxGateChecks; check++) {
+        const gateIndex = gateIndexes[check];
+        candidate.gate = {
+            keyId: "A",
+            between: [
+                [route[gateIndex - 1].row, route[gateIndex - 1].col],
+                [route[gateIndex].row, route[gateIndex].col]
+            ]
+        };
+        const validation = validateMazeV2KeyAndGate(candidate);
+
+        if (validation.valid) {
+            candidate.solution = validation.solution;
+            candidate.solutionLength = validation.solution.length - 1;
+            candidate.keyPathIndex = keyIndex;
+            candidate.gatePathIndex = gateIndex;
+            candidate.gateRequired = validation.gateRequired;
+            candidate.generationWork.gateCandidatesTested = check + 1;
+            return true;
+        }
+    }
+
+    candidate.key = null;
+    candidate.gate = null;
+    candidate.generationWork.gateCandidatesTested = maxGateChecks;
+    return false;
+}
+
+function canMoveBetweenMazeCells(
+    current,
+    destination,
+    maze,
+    options = {}
+) {
     if (!current || !destination || !maze?.cells) {
         return false;
     }
@@ -148,6 +215,13 @@ function canMoveBetweenMazeCells(current, destination, maze) {
         destination.row >= maze.rows ||
         destination.col < 0 ||
         destination.col >= maze.cols
+    ) {
+        return false;
+    }
+
+    if (
+        isMazeV2GateEdge(current, destination, maze) &&
+        (options.forceGateClosed || !options.hasKey)
     ) {
         return false;
     }
@@ -175,12 +249,22 @@ function canMoveBetweenMazeCells(current, destination, maze) {
         !destinationCell.walls.left;
 }
 
-function solveMazeV2ShortestPath(maze, start, goal) {
-    const key = position => `${position.row},${position.col}`;
-    const queue = [{ ...start }];
+function solveMazeV2ShortestPath(maze, start, goal, options = {}) {
+    const mechanicKey = maze?.key;
+    const isKeyPosition = position =>
+        mechanicKey &&
+        position.row === mechanicKey.position[0] &&
+        position.col === mechanicKey.position[1];
+    const stateKey = state =>
+        `${state.row},${state.col},${state.hasKey ? 1 : 0}`;
+    const startState = {
+        ...start,
+        hasKey: Boolean(options.hasKey || isKeyPosition(start))
+    };
+    const queue = [startState];
     const parents = new Map();
-    const visited = new Set([key(start)]);
-    let farthest = { ...start };
+    const visited = new Set([stateKey(startState)]);
+    let farthest = { ...startState };
 
     for (let index = 0; index < queue.length; index++) {
         const current = queue[index];
@@ -191,13 +275,13 @@ function solveMazeV2ShortestPath(maze, start, goal) {
             current.row === goal.row &&
             current.col === goal.col
         ) {
-            const path = [{ ...current }];
-            let cursorKey = key(current);
+            const path = [{ row: current.row, col: current.col }];
+            let cursorKey = stateKey(current);
 
-            while (cursorKey !== key(start)) {
+            while (cursorKey !== stateKey(startState)) {
                 const parent = parents.get(cursorKey);
-                path.push({ ...parent });
-                cursorKey = key(parent);
+                path.push({ row: parent.row, col: parent.col });
+                cursorKey = stateKey(parent);
             }
 
             return path.reverse();
@@ -211,13 +295,19 @@ function solveMazeV2ShortestPath(maze, start, goal) {
         ]) {
             const destination = {
                 row: current.row + rowChange,
-                col: current.col + colChange
+                col: current.col + colChange,
+                hasKey: current.hasKey
             };
-            const destinationKey = key(destination);
+            destination.hasKey = destination.hasKey ||
+                Boolean(isKeyPosition(destination));
+            const destinationKey = stateKey(destination);
 
             if (
                 visited.has(destinationKey) ||
-                !canMoveBetweenMazeCells(current, destination, maze)
+                !canMoveBetweenMazeCells(current, destination, maze, {
+                    hasKey: current.hasKey,
+                    forceGateClosed: options.forceGateClosed
+                })
             ) {
                 continue;
             }
@@ -228,7 +318,42 @@ function solveMazeV2ShortestPath(maze, start, goal) {
         }
     }
 
-    return goal ? null : [{ ...farthest }];
+    return goal ? null : [{ row: farthest.row, col: farthest.col }];
+}
+
+function validateMazeV2KeyAndGate(maze) {
+    if (!maze?.key || !maze?.gate) {
+        return { valid: false, gateRequired: false, solution: null };
+    }
+
+    const keyPosition = {
+        row: maze.key.position[0],
+        col: maze.key.position[1]
+    };
+    const keyReachable = solveMazeV2ShortestPath(
+        maze,
+        maze.start,
+        keyPosition,
+        { forceGateClosed: true }
+    );
+    const solution = solveMazeV2ShortestPath(
+        maze,
+        maze.start,
+        maze.goal
+    );
+    const bypass = solveMazeV2ShortestPath(
+        maze,
+        maze.start,
+        maze.goal,
+        { forceGateClosed: true }
+    );
+    const gateRequired = bypass === null;
+
+    return {
+        valid: Boolean(keyReachable && solution && gateRequired),
+        gateRequired,
+        solution
+    };
 }
 
 function findMazeV2FarthestCell(maze, origin) {
@@ -307,8 +432,9 @@ function renderMazeV2Preview(
     let activePath = [];
     let isTracing = false;
     let completed = false;
-    let checkpointActivated = false;
-    let checkpointPath = [];
+    let keyCollected = false;
+    let keyCheckpointPath = [];
+    let keyMarker = null;
     const svgNamespace = "http://www.w3.org/2000/svg";
     const traceSvg = document.createElementNS(svgNamespace, "svg");
     const tracePolyline = document.createElementNS(
@@ -316,6 +442,7 @@ function renderMazeV2Preview(
         "polyline"
     );
     const traceDot = document.createElementNS(svgNamespace, "circle");
+    const gateLine = document.createElementNS(svgNamespace, "line");
     traceSvg.classList.add("maze-v2-trace");
     traceSvg.setAttribute("viewBox", `0 0 ${maze.cols} ${maze.rows}`);
     traceSvg.setAttribute("preserveAspectRatio", "none");
@@ -333,7 +460,31 @@ function renderMazeV2Preview(
     traceDot.setAttribute("fill", "var(--maze-v2-trace-color)");
     traceDot.setAttribute("r", traceWidthRatio / 2);
     traceDot.style.display = "none";
-    traceSvg.append(tracePolyline, traceDot);
+    const [gateFirst, gateSecond] = maze.gate.between.map(
+        ([row, col]) => ({ row, col })
+    );
+    const gateMidpoint = {
+        row: (gateFirst.row + gateSecond.row) / 2 + 0.5,
+        col: (gateFirst.col + gateSecond.col) / 2 + 0.5
+    };
+    const gateHalfLength = 0.36;
+
+    if (gateFirst.row === gateSecond.row) {
+        gateLine.setAttribute("x1", gateMidpoint.col);
+        gateLine.setAttribute("x2", gateMidpoint.col);
+        gateLine.setAttribute("y1", gateMidpoint.row - gateHalfLength);
+        gateLine.setAttribute("y2", gateMidpoint.row + gateHalfLength);
+    } else {
+        gateLine.setAttribute("x1", gateMidpoint.col - gateHalfLength);
+        gateLine.setAttribute("x2", gateMidpoint.col + gateHalfLength);
+        gateLine.setAttribute("y1", gateMidpoint.row);
+        gateLine.setAttribute("y2", gateMidpoint.row);
+    }
+
+    gateLine.setAttribute("stroke", "var(--maze-v2-gate-color)");
+    gateLine.setAttribute("stroke-width", "0.16");
+    gateLine.setAttribute("stroke-linecap", "round");
+    traceSvg.append(tracePolyline, traceDot, gateLine);
     boardElement.appendChild(traceSvg);
 
     for (let row = 0; row < maze.rows; row++) {
@@ -372,12 +523,12 @@ function renderMazeV2Preview(
                 element.style.color = "var(--maze-v2-goal-color)";
                 element.style.fontSize = "clamp(1rem, 4.2vw, 1.75rem)";
             } else if (
-                row === maze.checkpoint.row &&
-                col === maze.checkpoint.col
+                row === maze.key.position[0] &&
+                col === maze.key.position[1]
             ) {
-                element.innerHTML = "<span>&#9670;</span>";
-                element.style.color = "var(--maze-v2-checkpoint-color)";
-                element.style.fontSize = "clamp(0.9rem, 3.8vw, 1.55rem)";
+                element.innerHTML = "<span>&#128273;</span>";
+                element.style.color = "var(--maze-v2-key-color)";
+                element.style.fontSize = "clamp(1rem, 4vw, 1.7rem)";
             }
 
             element.style.fontWeight = "900";
@@ -387,6 +538,13 @@ function renderMazeV2Preview(
             if (marker) {
                 marker.style.position = "relative";
                 marker.style.zIndex = "2";
+
+                if (
+                    row === maze.key.position[0] &&
+                    col === maze.key.position[1]
+                ) {
+                    keyMarker = marker;
+                }
             }
 
             boardElement.appendChild(element);
@@ -406,19 +564,31 @@ function renderMazeV2Preview(
         } else {
             traceDot.style.display = "none";
         }
+
+        gateLine.style.opacity = keyCollected ? "0.16" : "1";
+        gateLine.setAttribute(
+            "stroke",
+            keyCollected
+                ? "var(--maze-v2-gate-open-color)"
+                : "var(--maze-v2-gate-color)"
+        );
+
+        if (keyMarker) {
+            keyMarker.style.opacity = keyCollected ? "0.3" : "1";
+        }
     }
 
     function resetToStart() {
         activePath = [];
         isTracing = false;
         completed = false;
-        checkpointActivated = false;
-        checkpointPath = [];
+        keyCollected = false;
+        keyCheckpointPath = [];
         renderPath();
     }
 
     function resetToCheckpoint() {
-        activePath = checkpointPath.map(position => ({ ...position }));
+        activePath = keyCheckpointPath.map(position => ({ ...position }));
         isTracing = false;
         completed = false;
         renderPath();
@@ -470,8 +640,8 @@ function renderMazeV2Preview(
             previous &&
             previous.row === position.row &&
             previous.col === position.col &&
-            (!checkpointActivated ||
-                activePath.length > checkpointPath.length)
+            (!keyCollected ||
+                activePath.length > keyCheckpointPath.length)
         ) {
             activePath.pop();
             renderPath();
@@ -482,7 +652,9 @@ function renderMazeV2Preview(
             activePath.some(item =>
                 item.row === position.row && item.col === position.col
             ) ||
-            !canMoveBetweenMazeCells(current, position, maze)
+            !canMoveBetweenMazeCells(current, position, maze, {
+                hasKey: keyCollected
+            })
         ) {
             return;
         }
@@ -490,12 +662,12 @@ function renderMazeV2Preview(
         activePath.push(position);
 
         if (
-            !checkpointActivated &&
-            position.row === maze.checkpoint.row &&
-            position.col === maze.checkpoint.col
+            !keyCollected &&
+            position.row === maze.key.position[0] &&
+            position.col === maze.key.position[1]
         ) {
-            checkpointActivated = true;
-            checkpointPath = activePath.map(item => ({ ...item }));
+            keyCollected = true;
+            keyCheckpointPath = activePath.map(item => ({ ...item }));
         }
 
         renderPath();
@@ -512,8 +684,11 @@ function renderMazeV2Preview(
     function handlePointerDown(event) {
         const position = positionFromPointer(event);
 
-        const requiredOrigin = checkpointActivated
-            ? maze.checkpoint
+        const requiredOrigin = keyCollected
+            ? {
+                row: maze.key.position[0],
+                col: maze.key.position[1]
+            }
             : maze.start;
 
         if (!position ||
@@ -524,8 +699,8 @@ function renderMazeV2Preview(
 
         event.preventDefault();
         boardElement.setPointerCapture?.(event.pointerId);
-        activePath = checkpointActivated
-            ? checkpointPath.map(item => ({ ...item }))
+        activePath = keyCollected
+            ? keyCheckpointPath.map(item => ({ ...item }))
             : [{ ...position }];
         isTracing = true;
         completed = false;
@@ -543,7 +718,7 @@ function renderMazeV2Preview(
 
     function handlePointerEnd() {
         if (isTracing && !completed) {
-            if (checkpointActivated) {
+            if (keyCollected) {
                 resetToCheckpoint();
             } else {
                 resetToStart();
@@ -573,6 +748,7 @@ function renderMazeV2Preview(
 
     const controller = {
         reset: resetToStart,
+        isKeyCheckpointActive: () => keyCollected,
         destroy() {
             boardElement.removeEventListener(
                 "pointerdown",
