@@ -198,15 +198,19 @@ function loadMazePreview() {
     return candidate;
 }
 
-function loadMazeV2Preview() {
-    const candidate = createMazeV2Candidate(12, 12);
+function loadMazeV2Preview(mechanicMode = "switch") {
+    const candidate = createMazeV2Candidate(12, 12, {
+        mechanicMode
+    });
 
     if (!candidate) {
         console.error("Maze V2 preview generation failed");
         return null;
     }
 
-    const mechanicValidation = validateMazeV2KeyAndGate(candidate);
+    const mechanicValidation = mechanicMode === "switch"
+        ? validateMazeV2SwitchAndGate(candidate)
+        : validateMazeV2KeyAndGate(candidate);
     const solution = mechanicValidation.solution;
 
     if (
@@ -244,8 +248,9 @@ function loadMazeV2Preview() {
     }
 
     if (gameMessage) {
-        gameMessage.textContent =
-            "Collect Key A to open Gate A, then reach the star.";
+        gameMessage.textContent = mechanicMode === "switch"
+            ? "Activate S1 to open its gate, then reach the star."
+            : "Collect Key A to open Gate A, then reach the star.";
     }
 
     if (levelMessage) {
@@ -257,15 +262,22 @@ function loadMazeV2Preview() {
     console.log("Maze V2 preview", {
         rows: candidate.rows,
         columns: candidate.cols,
+        "mechanic mode": mechanicMode,
         start: candidate.start,
         goal: candidate.goal,
-        "key position": candidate.key.position,
-        "gate edge": candidate.gate.between,
-        "key checkpoint active":
-            controller.isKeyCheckpointActive(),
+        "checkpoint position": candidate.key?.position ||
+            candidate.checkpoint,
+        "key position": candidate.key?.position || null,
+        "gate edge": candidate.gate?.between || null,
+        "key checkpoint active": controller.isKeyCheckpointActive(),
+        "switch position": candidate.switch?.position || null,
+        "switch gate edge": candidate.switchGate?.between || null,
+        "switch active": controller.isSwitchActive(),
         "solution length": candidate.solutionLength,
         "final Optimal": candidate.solutionLength,
-        "gate required": mechanicValidation.gateRequired,
+        "gate required": mechanicValidation.gateRequired || false,
+        "switch gate required":
+            mechanicValidation.switchGateRequired || false,
         "trace width": MAZE_V2_TRACE_WIDTH_RATIO,
         "touch tolerance": MAZE_V2_TOUCH_TOLERANCE,
         "generation work": candidate.generationWork

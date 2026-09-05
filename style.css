@@ -31,6 +31,13 @@
   --maze-v2-key-color: #facc15;
   --maze-v2-gate-color: #ef4444;
   --maze-v2-gate-open-color: #4ade80;
+  --maze-v2-switch-color: #f472b6;
+  --maze-v2-switch-panel-background: #1f2937;
+  --maze-v2-switch-active-background: #22d3ee;
+  --maze-v2-switch-active-color: #111827;
+  --maze-v2-switch-gate-body-color: #263244;
+  --maze-v2-switch-gate-accent-color: #f472b6;
+  --maze-v2-switch-gate-hinge-color: #111827;
   --control-background: #334155;
   --control-hover: #475569;
   --control-disabled: #1e293b;
@@ -68,6 +75,13 @@
   --maze-v2-key-color: #ffffff;
   --maze-v2-gate-color: #ff4040;
   --maze-v2-gate-open-color: #00ff80;
+  --maze-v2-switch-color: #ff80ff;
+  --maze-v2-switch-panel-background: #000000;
+  --maze-v2-switch-active-background: #00ffff;
+  --maze-v2-switch-active-color: #000000;
+  --maze-v2-switch-gate-body-color: #ffffff;
+  --maze-v2-switch-gate-accent-color: #ff80ff;
+  --maze-v2-switch-gate-hinge-color: #000000;
   --control-background: #222222;
   --control-hover: #444444;
   --control-disabled: #111111;
@@ -105,6 +119,13 @@
   --maze-v2-key-color: #facc15;
   --maze-v2-gate-color: #f43f5e;
   --maze-v2-gate-open-color: #2dd4bf;
+  --maze-v2-switch-color: #e879f9;
+  --maze-v2-switch-panel-background: #202b3c;
+  --maze-v2-switch-active-background: #38bdf8;
+  --maze-v2-switch-active-color: #172033;
+  --maze-v2-switch-gate-body-color: #26344d;
+  --maze-v2-switch-gate-accent-color: #e879f9;
+  --maze-v2-switch-gate-hinge-color: #172033;
   --control-background: #354761;
   --control-hover: #4a607d;
   --control-disabled: #202b3c;
@@ -115,6 +136,29 @@
   margin: 0;
   padding: 0;
   box-sizing: border-box;
+}
+
+.maze-v2-switch-control {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.7em;
+  min-height: 1.4em;
+  padding: 0.08em 0.18em;
+  color: var(--maze-v2-switch-color);
+  background: var(--maze-v2-switch-panel-background);
+  border: 0.13em solid var(--maze-v2-switch-color);
+  border-radius: 0.32em;
+  line-height: 1;
+  box-shadow: inset 0 0 0 0.08em rgba(255, 255, 255, 0.12);
+  transition: background 140ms ease, color 140ms ease,
+    box-shadow 140ms ease;
+}
+
+.maze-v2-switch-control-active {
+  color: var(--maze-v2-switch-active-color);
+  background: var(--maze-v2-switch-active-background);
+  box-shadow: 0 0 0.35em var(--maze-v2-switch-active-background);
 }
 
 body {
