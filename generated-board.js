@@ -198,8 +198,12 @@ function loadMazePreview() {
     return candidate;
 }
 
-function loadMazeV2Preview(mechanicMode = "switch") {
-    const candidate = createMazeV2Candidate(12, 12, {
+function loadMazeV2Preview(
+    mechanicMode = "switch",
+    rows = 11,
+    cols = rows
+) {
+    const candidate = createMazeV2Candidate(rows, cols, {
         mechanicMode
     });
 

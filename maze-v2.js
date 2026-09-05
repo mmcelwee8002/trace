@@ -2,7 +2,7 @@ const MAZE_V2_TOUCH_TOLERANCE = 1.2;
 const MAZE_V2_TRACE_WIDTH_RATIO = 0.43;
 const MAZE_V2_WALL_WIDTH = "2px";
 
-function createMazeV2Candidate(rows = 12, cols = 12, options = {}) {
+function createMazeV2Candidate(rows = 11, cols = 11, options = {}) {
     if (
         !Number.isInteger(rows) ||
         !Number.isInteger(cols) ||
