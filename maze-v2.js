@@ -934,6 +934,16 @@ function analyzeMazeV2Candidate(candidate) {
         ).toFixed(3))
         : 0;
     const wrongPathMetrics = analyzeMazeV2WrongBranches(candidate);
+    const averageWrongBranchRatio = totalCells > 0
+        ? Number((
+            wrongPathMetrics.averageWrongBranchDepth / totalCells
+        ).toFixed(4))
+        : 0;
+    const longestWrongBranchRatio = totalCells > 0
+        ? Number((
+            wrongPathMetrics.longestWrongBranchDepth / totalCells
+        ).toFixed(4))
+        : 0;
 
     return {
         rows: candidate.rows,
@@ -951,10 +961,67 @@ function analyzeMazeV2Candidate(candidate) {
         startGoalManhattanDistance,
         detourRatio,
         ...wrongPathMetrics,
+        averageWrongBranchRatio,
+        longestWrongBranchRatio,
         hasKey,
         hasSwitch,
         mechanicCount: Number(hasKey) + Number(hasSwitch)
     };
+}
+
+function scoreMazeV2Difficulty(candidate) {
+    const analysis = analyzeMazeV2Candidate(candidate);
+
+    if (!analysis) {
+        return null;
+    }
+
+    const clamp01 = value => Math.max(0, Math.min(1, value));
+    const totalCells = Math.max(1, analysis.totalCells);
+    const optimalRatio = analysis.optimal / totalCells;
+    const route = 100 * clamp01((
+        analysis.solutionUsageRatio * 0.7 + optimalRatio * 0.3
+    ) / 0.8);
+    const normalizedDetour = clamp01(
+        (analysis.detourRatio - 1) / 7
+    );
+    const deception = 100 * (
+        clamp01(analysis.longestWrongBranchRatio / 0.3) * 0.45 +
+        clamp01(analysis.averageWrongBranchRatio / 0.1) * 0.3 +
+        normalizedDetour * 0.25
+    );
+    const mechanics = 100 * clamp01(analysis.mechanicCount / 2);
+    const solutionMoves = Math.max(1, analysis.solutionCellCount - 1);
+    const topology = 100 * (
+        clamp01((analysis.solutionTurns / solutionMoves) / 0.65) * 0.5 +
+        clamp01((analysis.intersections / totalCells) / 0.15) * 0.3 +
+        clamp01((analysis.wrongBranchCount / totalCells) / 0.12) * 0.2
+    );
+    const components = {
+        route: Number(route.toFixed(1)),
+        deception: Number(deception.toFixed(1)),
+        mechanics: Number(mechanics.toFixed(1)),
+        topology: Number(topology.toFixed(1))
+    };
+    const score = Number((
+        components.route * 0.4 +
+        components.deception * 0.35 +
+        components.mechanics * 0.15 +
+        components.topology * 0.1
+    ).toFixed(1));
+
+    // Provisional thresholds: calibrate these through Maze V2 playtesting.
+    let tier = "Extreme";
+
+    if (score < 35) {
+        tier = "Easy";
+    } else if (score < 55) {
+        tier = "Medium";
+    } else if (score < 75) {
+        tier = "Hard";
+    }
+
+    return { score, tier, components };
 }
 
 function testMazeV2Analysis(mode = "switch", count = 5) {
@@ -985,19 +1052,66 @@ function testMazeV2Analysis(mode = "switch", count = 5) {
     console.table(analyses.map(analysis => ({
         Sample: analysis.sample,
         Optimal: analysis.optimal,
-        "Detour Ratio": analysis.detourRatio,
-        "Wrong Branches": analysis.wrongBranchCount,
-        "Avg Wrong Depth": analysis.averageWrongBranchDepth,
-        "Longest Wrong Depth": analysis.longestWrongBranchDepth,
-        "Dead Ends": analysis.deadEnds,
-        Intersections: analysis.intersections,
         "Solution Usage": Number(
             analysis.solutionUsageRatio.toFixed(3)
         ),
-        "Solution Turns": analysis.solutionTurns,
+        "Detour Ratio": analysis.detourRatio,
+        "Wrong Branches": analysis.wrongBranchCount,
+        "Avg Wrong Depth": analysis.averageWrongBranchDepth,
+        "Avg Wrong Ratio": analysis.averageWrongBranchRatio,
+        "Longest Wrong Depth": analysis.longestWrongBranchDepth,
+        "Longest Wrong Ratio": analysis.longestWrongBranchRatio,
         "Mechanic Count": analysis.mechanicCount
     })));
     return analyses;
+}
+
+function testMazeV2Difficulty(mode = "switch", count = 5) {
+    const supportedModes = new Set(["key", "switch", "key-switch"]);
+
+    if (!supportedModes.has(mode)) {
+        console.error(`Unsupported Maze V2 mechanic mode: ${mode}`);
+        return [];
+    }
+
+    const requestedCount = Number.isFinite(Number(count))
+        ? Math.floor(Number(count))
+        : 5;
+    const safeCount = Math.max(1, Math.min(50, requestedCount));
+    const results = [];
+
+    for (let index = 0; index < safeCount; index++) {
+        const candidate = createMazeV2Candidate(10, 10, {
+            mechanicMode: mode
+        });
+        const analysis = analyzeMazeV2Candidate(candidate);
+        const difficulty = scoreMazeV2Difficulty(candidate);
+
+        if (!analysis || !difficulty) {
+            continue;
+        }
+
+        results.push({
+            Sample: index + 1,
+            Score: difficulty.score,
+            Tier: difficulty.tier,
+            Optimal: analysis.optimal,
+            "Solution Usage": Number(
+                analysis.solutionUsageRatio.toFixed(3)
+            ),
+            "Detour Ratio": analysis.detourRatio,
+            "Longest Wrong Ratio": analysis.longestWrongBranchRatio,
+            "Avg Wrong Ratio": analysis.averageWrongBranchRatio,
+            "Mechanic Count": analysis.mechanicCount,
+            Route: difficulty.components.route,
+            Deception: difficulty.components.deception,
+            Mechanics: difficulty.components.mechanics,
+            Topology: difficulty.components.topology
+        });
+    }
+
+    console.table(results);
+    return results;
 }
 
 function findMazeV2FarthestCell(maze, origin) {
