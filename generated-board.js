@@ -388,7 +388,7 @@ function attachMazeV2PreviewButton() {
             let candidate = null;
 
             try {
-                candidate = loadMazeV2Preview("switch");
+                candidate = loadMazeV2Preview("key-switch");
             } catch (error) {
                 console.error("Maze V2 preview button failed", error);
             }
