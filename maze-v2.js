@@ -765,6 +765,241 @@ function validateMazeV2KeySwitch(maze) {
     };
 }
 
+function getMazeV2OpenNeighbors(candidate, position) {
+    const directions = [
+        { row: -1, col: 0, wall: "top", opposite: "bottom" },
+        { row: 1, col: 0, wall: "bottom", opposite: "top" },
+        { row: 0, col: -1, wall: "left", opposite: "right" },
+        { row: 0, col: 1, wall: "right", opposite: "left" }
+    ];
+    const currentCell = candidate.cells[position.row]?.[position.col];
+
+    if (!currentCell?.walls) {
+        return [];
+    }
+
+    return directions.flatMap(direction => {
+        const row = position.row + direction.row;
+        const col = position.col + direction.col;
+        const neighbor = candidate.cells[row]?.[col];
+
+        if (
+            !neighbor?.walls ||
+            currentCell.walls[direction.wall] ||
+            neighbor.walls[direction.opposite]
+        ) {
+            return [];
+        }
+
+        return [{ row, col }];
+    });
+}
+
+function analyzeMazeV2WrongBranches(candidate) {
+    const positionKey = position => `${position.row},${position.col}`;
+    const solutionCells = new Set(candidate.solution.map(positionKey));
+    const visitedOffRoute = new Set();
+    const branchDepths = [];
+
+    for (const routePosition of candidate.solution) {
+        for (const neighbor of getMazeV2OpenNeighbors(
+            candidate,
+            routePosition
+        )) {
+            const neighborKey = positionKey(neighbor);
+
+            if (
+                solutionCells.has(neighborKey) ||
+                visitedOffRoute.has(neighborKey)
+            ) {
+                continue;
+            }
+
+            const queue = [{ ...neighbor, depth: 1 }];
+            visitedOffRoute.add(neighborKey);
+            let longestDepth = 1;
+
+            for (let index = 0; index < queue.length; index++) {
+                const current = queue[index];
+                longestDepth = Math.max(longestDepth, current.depth);
+
+                for (const next of getMazeV2OpenNeighbors(
+                    candidate,
+                    current
+                )) {
+                    const nextKey = positionKey(next);
+
+                    if (
+                        solutionCells.has(nextKey) ||
+                        visitedOffRoute.has(nextKey)
+                    ) {
+                        continue;
+                    }
+
+                    visitedOffRoute.add(nextKey);
+                    queue.push({ ...next, depth: current.depth + 1 });
+                }
+            }
+
+            branchDepths.push(longestDepth);
+        }
+    }
+
+    const totalDepth = branchDepths.reduce(
+        (sum, depth) => sum + depth,
+        0
+    );
+
+    return {
+        wrongBranchCount: branchDepths.length,
+        averageWrongBranchDepth: branchDepths.length > 0
+            ? Number((totalDepth / branchDepths.length).toFixed(2))
+            : 0,
+        longestWrongBranchDepth: branchDepths.length > 0
+            ? Math.max(...branchDepths)
+            : 0
+    };
+}
+
+function analyzeMazeV2Candidate(candidate) {
+    if (
+        !candidate ||
+        !Number.isInteger(candidate.rows) ||
+        !Number.isInteger(candidate.cols) ||
+        !Array.isArray(candidate.cells) ||
+        !Array.isArray(candidate.solution)
+    ) {
+        return null;
+    }
+
+    const totalCells = candidate.rows * candidate.cols;
+    const solutionCellCount = candidate.solution.length;
+    let deadEnds = 0;
+    let intersections = 0;
+    let corridorCells = 0;
+
+    for (let row = 0; row < candidate.rows; row++) {
+        for (let col = 0; col < candidate.cols; col++) {
+            const cell = candidate.cells[row]?.[col];
+
+            if (!cell?.walls) {
+                continue;
+            }
+
+            const openPassages = Object.values(cell.walls)
+                .filter(hasWall => !hasWall).length;
+
+            if (openPassages === 1) {
+                deadEnds++;
+            } else if (openPassages === 2) {
+                corridorCells++;
+            } else if (openPassages >= 3) {
+                intersections++;
+            }
+        }
+    }
+
+    let solutionTurns = 0;
+
+    for (let index = 2; index < candidate.solution.length; index++) {
+        const previous = candidate.solution[index - 2];
+        const current = candidate.solution[index - 1];
+        const next = candidate.solution[index];
+        const incomingDirection = {
+            row: current.row - previous.row,
+            col: current.col - previous.col
+        };
+        const outgoingDirection = {
+            row: next.row - current.row,
+            col: next.col - current.col
+        };
+
+        if (
+            incomingDirection.row !== outgoingDirection.row ||
+            incomingDirection.col !== outgoingDirection.col
+        ) {
+            solutionTurns++;
+        }
+    }
+
+    const hasKey = Boolean(candidate.key);
+    const hasSwitch = Boolean(candidate.switch);
+    const startGoalManhattanDistance =
+        Math.abs(candidate.start.row - candidate.goal.row) +
+        Math.abs(candidate.start.col - candidate.goal.col);
+    const detourRatio = startGoalManhattanDistance > 0 &&
+        Number.isFinite(candidate.solutionLength)
+        ? Number((
+            candidate.solutionLength / startGoalManhattanDistance
+        ).toFixed(3))
+        : 0;
+    const wrongPathMetrics = analyzeMazeV2WrongBranches(candidate);
+
+    return {
+        rows: candidate.rows,
+        cols: candidate.cols,
+        totalCells,
+        optimal: candidate.solutionLength,
+        solutionCellCount,
+        solutionUsageRatio: totalCells > 0
+            ? solutionCellCount / totalCells
+            : 0,
+        deadEnds,
+        intersections,
+        corridorCells,
+        solutionTurns,
+        startGoalManhattanDistance,
+        detourRatio,
+        ...wrongPathMetrics,
+        hasKey,
+        hasSwitch,
+        mechanicCount: Number(hasKey) + Number(hasSwitch)
+    };
+}
+
+function testMazeV2Analysis(mode = "switch", count = 5) {
+    const supportedModes = new Set(["key", "switch", "key-switch"]);
+
+    if (!supportedModes.has(mode)) {
+        console.error(`Unsupported Maze V2 mechanic mode: ${mode}`);
+        return [];
+    }
+
+    const requestedCount = Number.isFinite(Number(count))
+        ? Math.floor(Number(count))
+        : 5;
+    const safeCount = Math.max(1, Math.min(50, requestedCount));
+    const analyses = [];
+
+    for (let index = 0; index < safeCount; index++) {
+        const candidate = createMazeV2Candidate(10, 10, {
+            mechanicMode: mode
+        });
+        const analysis = analyzeMazeV2Candidate(candidate);
+
+        if (analysis) {
+            analyses.push({ sample: index + 1, ...analysis });
+        }
+    }
+
+    console.table(analyses.map(analysis => ({
+        Sample: analysis.sample,
+        Optimal: analysis.optimal,
+        "Detour Ratio": analysis.detourRatio,
+        "Wrong Branches": analysis.wrongBranchCount,
+        "Avg Wrong Depth": analysis.averageWrongBranchDepth,
+        "Longest Wrong Depth": analysis.longestWrongBranchDepth,
+        "Dead Ends": analysis.deadEnds,
+        Intersections: analysis.intersections,
+        "Solution Usage": Number(
+            analysis.solutionUsageRatio.toFixed(3)
+        ),
+        "Solution Turns": analysis.solutionTurns,
+        "Mechanic Count": analysis.mechanicCount
+    })));
+    return analyses;
+}
+
 function findMazeV2FarthestCell(maze, origin) {
     const queue = [{ ...origin, distance: 0 }];
     const visited = new Set([`${origin.row},${origin.col}`]);
