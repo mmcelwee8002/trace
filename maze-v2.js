@@ -2,8 +2,57 @@ const MAZE_V2_TOUCH_TOLERANCE = 1.2;
 const MAZE_V2_TRACE_WIDTH_RATIO = 0.43;
 const MAZE_V2_WALL_WIDTH = "2px";
 let mazeV2DifficultySamples = [];
+let mazeV2DifficultyProfileSamples = [];
 
-function createMazeV2Candidate(rows = 10, cols = 10, options = {}) {
+function createMazeV2Candidate(
+    rows = 10,
+    cols = 10,
+    options = {},
+    difficultyProfile = null
+) {
+    const mechanicMode = typeof options === "string"
+        ? options
+        : options.mechanicMode || "key";
+
+    if (difficultyProfile !== "easy" || mechanicMode !== "none") {
+        return createMazeV2BaselineCandidate(rows, cols, options);
+    }
+
+    const sampleCount = 12;
+    let easiestCandidate = null;
+    let easiestDifficulty = null;
+
+    for (let sample = 0; sample < sampleCount; sample++) {
+        const candidate = createMazeV2EasyTopologyCandidate(
+            rows,
+            cols
+        );
+        const difficulty = scoreMazeV2Difficulty(candidate);
+
+        if (
+            difficulty &&
+            (!easiestDifficulty ||
+                difficulty.score < easiestDifficulty.score)
+        ) {
+            easiestCandidate = candidate;
+            easiestDifficulty = difficulty;
+        }
+    }
+
+    if (easiestCandidate) {
+        easiestCandidate.difficultyProfile = "easy";
+        easiestCandidate.generationWork.easyCandidatesEvaluated =
+            sampleCount;
+    }
+
+    return easiestCandidate;
+}
+
+function createMazeV2BaselineCandidate(
+    rows = 10,
+    cols = 10,
+    options = {}
+) {
     if (
         !Number.isInteger(rows) ||
         !Number.isInteger(cols) ||
@@ -132,6 +181,208 @@ function createMazeV2Candidate(rows = 10, cols = 10, options = {}) {
     }
 
     return candidate;
+}
+
+function createMazeV2EasyTopologyCandidate(rows = 10, cols = 10) {
+    if (
+        !Number.isInteger(rows) ||
+        !Number.isInteger(cols) ||
+        rows < 3 ||
+        cols < 3 ||
+        rows > 40 ||
+        cols > 40
+    ) {
+        return null;
+    }
+
+    const cells = Array.from({ length: rows }, (_, row) =>
+        Array.from({ length: cols }, (_, col) => ({
+            row,
+            col,
+            walls: {
+                top: true,
+                right: true,
+                bottom: true,
+                left: true
+            }
+        }))
+    );
+    const directions = [
+        { row: -1, col: 0, wall: "top", opposite: "bottom" },
+        { row: 0, col: 1, wall: "right", opposite: "left" },
+        { row: 1, col: 0, wall: "bottom", opposite: "top" },
+        { row: 0, col: -1, wall: "left", opposite: "right" }
+    ];
+    const positionKey = position => `${position.row},${position.col}`;
+    const seed = {
+        row: Math.floor(Math.random() * rows),
+        col: Math.floor(Math.random() * cols)
+    };
+    const visited = new Set([positionKey(seed)]);
+    const activeCells = [{ ...seed }];
+    let generationWork = 0;
+
+    while (activeCells.length > 0) {
+        generationWork++;
+        const activeIndex = Math.random() < 0.8
+            ? activeCells.length - 1
+            : Math.floor(Math.random() * activeCells.length);
+        const current = activeCells[activeIndex];
+        const available = directions.filter(direction => {
+            const row = current.row + direction.row;
+            const col = current.col + direction.col;
+            return row >= 0 && row < rows && col >= 0 && col < cols &&
+                !visited.has(`${row},${col}`);
+        });
+
+        if (available.length === 0) {
+            activeCells.splice(activeIndex, 1);
+            continue;
+        }
+
+        const direction = available[
+            Math.floor(Math.random() * available.length)
+        ];
+        const destination = {
+            row: current.row + direction.row,
+            col: current.col + direction.col
+        };
+        cells[current.row][current.col].walls[direction.wall] = false;
+        cells[destination.row][destination.col]
+            .walls[direction.opposite] = false;
+        visited.add(positionKey(destination));
+        activeCells.push(destination);
+    }
+
+    const maze = { rows, cols, cells };
+    const endpoints = chooseMazeV2EasyEndpoints(maze);
+    const start = endpoints.start;
+    const goal = endpoints.goal;
+    const solution = solveMazeV2ShortestPath(maze, start, goal);
+
+    if (!solution) {
+        return null;
+    }
+
+    const candidate = {
+        id: "MAZE-V2-EXPERIMENT",
+        title: "Trace",
+        mechanicMode: "none",
+        rows,
+        cols,
+        cells,
+        start,
+        goal,
+        key: null,
+        gate: null,
+        checkpoint: null,
+        checkpointPathIndex: null,
+        switch: null,
+        switchGate: null,
+        solutionLength: solution.length - 1,
+        solution,
+        keys: [],
+        switches: [],
+        gates: [],
+        arrows: [],
+        generationWork: {
+            strategy: "easy-growing-tree",
+            growthSteps: generationWork,
+            visitedCells: visited.size
+        }
+    };
+    placeMazeV2RegularCheckpoint(candidate, solution);
+    return validateMazeV2Plain(candidate).valid ? candidate : null;
+}
+
+function chooseMazeV2EasyEndpoints(maze) {
+    const positions = [];
+
+    for (let row = 0; row < maze.rows; row++) {
+        for (let col = 0; col < maze.cols; col++) {
+            positions.push({ row, col });
+        }
+    }
+
+    const targetMoves = Math.round(maze.rows * maze.cols * 0.42);
+    const minimumMoves = Math.round(maze.rows * maze.cols * 0.3);
+    const minimumManhattan = Math.round(
+        (maze.rows + maze.cols - 2) * 0.55
+    );
+    let bestPair = null;
+    let bestPairScore = Infinity;
+
+    for (let originIndex = 0;
+        originIndex < positions.length;
+        originIndex++
+    ) {
+        const origin = positions[originIndex];
+        const queue = [{ ...origin, distance: 0 }];
+        const distances = new Map([
+            [`${origin.row},${origin.col}`, 0]
+        ]);
+
+        for (let index = 0; index < queue.length; index++) {
+            const current = queue[index];
+
+            for (const neighbor of getMazeV2OpenNeighbors(
+                maze,
+                current
+            )) {
+                const neighborKey = `${neighbor.row},${neighbor.col}`;
+
+                if (distances.has(neighborKey)) {
+                    continue;
+                }
+
+                const distance = current.distance + 1;
+                distances.set(neighborKey, distance);
+                queue.push({ ...neighbor, distance });
+            }
+        }
+
+        for (let goalIndex = originIndex + 1;
+            goalIndex < positions.length;
+            goalIndex++
+        ) {
+            const goal = positions[goalIndex];
+            const distance = distances.get(`${goal.row},${goal.col}`);
+            const manhattan =
+                Math.abs(origin.row - goal.row) +
+                Math.abs(origin.col - goal.col);
+
+            if (
+                distance < minimumMoves ||
+                manhattan < minimumManhattan
+            ) {
+                continue;
+            }
+
+            const detour = distance / Math.max(1, manhattan);
+            const pairScore = Math.abs(distance - targetMoves) +
+                Math.max(0, detour - 2.5) * 4 +
+                Math.random() * 0.25;
+
+            if (pairScore < bestPairScore) {
+                bestPairScore = pairScore;
+                bestPair = {
+                    start: { ...origin },
+                    goal: { ...goal }
+                };
+            }
+        }
+    }
+
+    if (bestPair) {
+        return Math.random() < 0.5
+            ? bestPair
+            : { start: bestPair.goal, goal: bestPair.start };
+    }
+
+    return {
+        start: { row: 0, col: 0 },
+        goal: { row: maze.rows - 1, col: maze.cols - 1 }
+    };
 }
 
 function placeMazeV2RegularCheckpoint(candidate, route) {
@@ -1157,6 +1408,103 @@ function testMazeV2Difficulty(mode = "switch", count = 5) {
 
     console.table(results);
     return results;
+}
+
+function testMazeV2DifficultyProfile(
+    profile = "easy",
+    mode = "none",
+    count = 20
+) {
+    mazeV2DifficultyProfileSamples = [];
+
+    if (profile !== "easy" || mode !== "none") {
+        console.warn(
+            "Maze V2 currently supports only the easy/none profile test."
+        );
+        return [];
+    }
+
+    const requestedCount = Number.isFinite(Number(count))
+        ? Math.floor(Number(count))
+        : 20;
+    const safeCount = Math.max(1, Math.min(30, requestedCount));
+    const results = [];
+
+    for (let index = 0; index < safeCount; index++) {
+        const candidate = createMazeV2Candidate(
+            10,
+            10,
+            mode,
+            profile
+        );
+        const analysis = analyzeMazeV2Candidate(candidate);
+        const difficulty = scoreMazeV2Difficulty(candidate);
+
+        if (!analysis || !difficulty) {
+            continue;
+        }
+
+        mazeV2DifficultyProfileSamples.push({
+            candidate,
+            analysis,
+            difficulty,
+            profile,
+            mode
+        });
+
+        results.push({
+            Sample: mazeV2DifficultyProfileSamples.length,
+            Score: difficulty.score,
+            Tier: difficulty.tier,
+            Optimal: analysis.optimal,
+            "Solution Usage": Number(
+                analysis.solutionUsageRatio.toFixed(3)
+            ),
+            "Detour Ratio": analysis.detourRatio,
+            "Avg Wrong Ratio": analysis.averageWrongBranchRatio,
+            "Longest Wrong Ratio": analysis.longestWrongBranchRatio
+        });
+    }
+
+    console.table(results);
+    return results;
+}
+
+// Profile sample numbers are 1-based to match the console table.
+function loadMazeV2DifficultyProfileSample(index) {
+    const sampleNumber = Number(index);
+
+    if (mazeV2DifficultyProfileSamples.length === 0) {
+        console.warn(
+            "No Maze V2 difficulty-profile samples are available. " +
+            "Run testMazeV2DifficultyProfile() first."
+        );
+        return null;
+    }
+
+    if (
+        !Number.isInteger(sampleNumber) ||
+        sampleNumber < 1 ||
+        sampleNumber > mazeV2DifficultyProfileSamples.length
+    ) {
+        console.warn(
+            `Invalid Maze V2 profile sample index: ${index}. ` +
+            `Choose 1-${mazeV2DifficultyProfileSamples.length}.`
+        );
+        return null;
+    }
+
+    if (typeof loadMazeV2CandidatePreview !== "function") {
+        console.warn("Maze V2 preview loader is unavailable.");
+        return null;
+    }
+
+    const storedSample =
+        mazeV2DifficultyProfileSamples[sampleNumber - 1];
+    return loadMazeV2CandidatePreview(
+        storedSample.candidate,
+        storedSample.candidate.mechanicMode
+    );
 }
 
 // Difficulty sample numbers are 1-based to match the console table.
