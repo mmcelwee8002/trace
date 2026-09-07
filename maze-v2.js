@@ -1,6 +1,7 @@
 const MAZE_V2_TOUCH_TOLERANCE = 1.2;
 const MAZE_V2_TRACE_WIDTH_RATIO = 0.43;
 const MAZE_V2_WALL_WIDTH = "2px";
+let mazeV2DifficultySamples = [];
 
 function createMazeV2Candidate(rows = 10, cols = 10, options = {}) {
     if (
@@ -112,6 +113,11 @@ function createMazeV2Candidate(rows = 10, cols = 10, options = {}) {
 
     if (mechanicMode === "switch") {
         mechanicsPlaced = placeMazeV2SwitchAndGate(candidate, solution);
+    } else if (mechanicMode === "none") {
+        placeMazeV2RegularCheckpoint(candidate, solution);
+        candidate.solution = solution;
+        candidate.solutionLength = solution.length - 1;
+        mechanicsPlaced = true;
     } else if (mechanicMode === "key-switch") {
         mechanicsPlaced = placeMazeV2KeySwitchMechanics(
             candidate,
@@ -765,6 +771,28 @@ function validateMazeV2KeySwitch(maze) {
     };
 }
 
+function validateMazeV2Plain(maze) {
+    if (
+        !maze || maze.key || maze.gate ||
+        maze.switch || maze.switchGate
+    ) {
+        return { valid: false, solution: null };
+    }
+
+    const solution = solveMazeV2ShortestPath(
+        maze,
+        maze.start,
+        maze.goal
+    );
+
+    return {
+        valid: Boolean(
+            solution && solution.length - 1 === maze.solutionLength
+        ),
+        solution
+    };
+}
+
 function getMazeV2OpenNeighbors(candidate, position) {
     const directions = [
         { row: -1, col: 0, wall: "top", opposite: "bottom" },
@@ -1025,7 +1053,12 @@ function scoreMazeV2Difficulty(candidate) {
 }
 
 function testMazeV2Analysis(mode = "switch", count = 5) {
-    const supportedModes = new Set(["key", "switch", "key-switch"]);
+    const supportedModes = new Set([
+        "none",
+        "key",
+        "switch",
+        "key-switch"
+    ]);
 
     if (!supportedModes.has(mode)) {
         console.error(`Unsupported Maze V2 mechanic mode: ${mode}`);
@@ -1067,7 +1100,13 @@ function testMazeV2Analysis(mode = "switch", count = 5) {
 }
 
 function testMazeV2Difficulty(mode = "switch", count = 5) {
-    const supportedModes = new Set(["key", "switch", "key-switch"]);
+    const supportedModes = new Set([
+        "none",
+        "key",
+        "switch",
+        "key-switch"
+    ]);
+    mazeV2DifficultySamples = [];
 
     if (!supportedModes.has(mode)) {
         console.error(`Unsupported Maze V2 mechanic mode: ${mode}`);
@@ -1091,8 +1130,14 @@ function testMazeV2Difficulty(mode = "switch", count = 5) {
             continue;
         }
 
+        mazeV2DifficultySamples.push({
+            candidate,
+            analysis,
+            difficulty
+        });
+
         results.push({
-            Sample: index + 1,
+            Sample: mazeV2DifficultySamples.length,
             Score: difficulty.score,
             Tier: difficulty.tier,
             Optimal: analysis.optimal,
@@ -1112,6 +1157,42 @@ function testMazeV2Difficulty(mode = "switch", count = 5) {
 
     console.table(results);
     return results;
+}
+
+// Difficulty sample numbers are 1-based to match the console table.
+function loadMazeV2DifficultySample(index) {
+    const sampleNumber = Number(index);
+
+    if (mazeV2DifficultySamples.length === 0) {
+        console.warn(
+            "No Maze V2 difficulty samples are available. " +
+            "Run testMazeV2Difficulty() first."
+        );
+        return null;
+    }
+
+    if (
+        !Number.isInteger(sampleNumber) ||
+        sampleNumber < 1 ||
+        sampleNumber > mazeV2DifficultySamples.length
+    ) {
+        console.warn(
+            `Invalid Maze V2 sample index: ${index}. ` +
+            `Choose 1-${mazeV2DifficultySamples.length}.`
+        );
+        return null;
+    }
+
+    if (typeof loadMazeV2CandidatePreview !== "function") {
+        console.warn("Maze V2 preview loader is unavailable.");
+        return null;
+    }
+
+    const storedSample = mazeV2DifficultySamples[sampleNumber - 1];
+    return loadMazeV2CandidatePreview(
+        storedSample.candidate,
+        storedSample.candidate.mechanicMode
+    );
 }
 
 function findMazeV2FarthestCell(maze, origin) {
@@ -1207,6 +1288,7 @@ function renderMazeV2Preview(
         : null;
     const checkpointPosition = keyPosition || maze.checkpoint;
     const controlledGate = maze.gate || maze.switchGate;
+    const hasControlledGate = Boolean(controlledGate);
     const primaryIsSwitchGate = Boolean(
         maze.switchGate && !maze.gate
     );
@@ -1244,7 +1326,9 @@ function renderMazeV2Preview(
     traceDot.setAttribute("fill", "var(--maze-v2-trace-color)");
     traceDot.setAttribute("r", traceWidthRatio / 2);
     traceDot.style.display = "none";
-    const [gateFirst, gateSecond] = controlledGate.between.map(
+    const [gateFirst, gateSecond] = (
+        controlledGate?.between || [[-2, -2], [-2, -2]]
+    ).map(
         ([row, col]) => ({ row, col })
     );
     const gateMidpoint = {
@@ -1282,6 +1366,10 @@ function renderMazeV2Preview(
     );
     gateLine.setAttribute("stroke-width", "0.16");
     gateLine.setAttribute("stroke-linecap", "round");
+
+    if (!hasControlledGate) {
+        gateLine.style.display = "none";
+    }
 
     if (primaryIsSwitchGate) {
         const accentHalfLength = 0.13;
@@ -1523,7 +1611,9 @@ function renderMazeV2Preview(
             ? switchActive
             : keyCollected;
 
-        if (primaryIsSwitchGate) {
+        if (!hasControlledGate) {
+            gateLine.style.display = "none";
+        } else if (primaryIsSwitchGate) {
             switchGateGroup.style.display = switchActive
                 ? "none"
                 : "inline";

@@ -207,6 +207,14 @@ function loadMazeV2Preview(
         mechanicMode
     });
 
+    return loadMazeV2CandidatePreview(candidate, mechanicMode);
+}
+
+function loadMazeV2CandidatePreview(
+    candidate,
+    mechanicMode = candidate?.mechanicMode || "switch"
+) {
+
     if (!candidate) {
         console.error("Maze V2 preview generation failed");
         return null;
@@ -214,7 +222,9 @@ function loadMazeV2Preview(
 
     let mechanicValidation = null;
 
-    if (mechanicMode === "switch") {
+    if (mechanicMode === "none") {
+        mechanicValidation = validateMazeV2Plain(candidate);
+    } else if (mechanicMode === "switch") {
         mechanicValidation = validateMazeV2SwitchAndGate(candidate);
     } else if (mechanicMode === "key-switch") {
         mechanicValidation = validateMazeV2KeySwitch(candidate);
@@ -258,7 +268,10 @@ function loadMazeV2Preview(
     }
 
     if (gameMessage) {
-        if (mechanicMode === "switch") {
+        if (mechanicMode === "none") {
+            gameMessage.textContent =
+                "Trace from the circle to the star without crossing a wall.";
+        } else if (mechanicMode === "switch") {
             gameMessage.textContent =
                 "Activate S1 to open its gate, then reach the star.";
         } else if (mechanicMode === "key-switch") {
