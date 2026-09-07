@@ -212,9 +212,15 @@ function loadMazeV2Preview(
         return null;
     }
 
-    const mechanicValidation = mechanicMode === "switch"
-        ? validateMazeV2SwitchAndGate(candidate)
-        : validateMazeV2KeyAndGate(candidate);
+    let mechanicValidation = null;
+
+    if (mechanicMode === "switch") {
+        mechanicValidation = validateMazeV2SwitchAndGate(candidate);
+    } else if (mechanicMode === "key-switch") {
+        mechanicValidation = validateMazeV2KeySwitch(candidate);
+    } else {
+        mechanicValidation = validateMazeV2KeyAndGate(candidate);
+    }
     const solution = mechanicValidation.solution;
 
     if (
@@ -252,9 +258,16 @@ function loadMazeV2Preview(
     }
 
     if (gameMessage) {
-        gameMessage.textContent = mechanicMode === "switch"
-            ? "Activate S1 to open its gate, then reach the star."
-            : "Collect Key A to open Gate A, then reach the star.";
+        if (mechanicMode === "switch") {
+            gameMessage.textContent =
+                "Activate S1 to open its gate, then reach the star.";
+        } else if (mechanicMode === "key-switch") {
+            gameMessage.textContent =
+                "Collect Key A and activate S1, then reach the star.";
+        } else {
+            gameMessage.textContent =
+                "Collect Key A to open Gate A, then reach the star.";
+        }
     }
 
     if (levelMessage) {

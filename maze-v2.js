@@ -108,9 +108,18 @@ function createMazeV2Candidate(rows = 10, cols = 10, options = {}) {
         }
     };
 
-    const mechanicsPlaced = mechanicMode === "switch"
-        ? placeMazeV2SwitchAndGate(candidate, solution)
-        : placeMazeV2KeyAndGate(candidate, solution);
+    let mechanicsPlaced = false;
+
+    if (mechanicMode === "switch") {
+        mechanicsPlaced = placeMazeV2SwitchAndGate(candidate, solution);
+    } else if (mechanicMode === "key-switch") {
+        mechanicsPlaced = placeMazeV2KeySwitchMechanics(
+            candidate,
+            solution
+        );
+    } else {
+        mechanicsPlaced = placeMazeV2KeyAndGate(candidate, solution);
+    }
 
     if (!mechanicsPlaced) {
         return null;
@@ -332,6 +341,108 @@ function placeMazeV2SwitchAndGate(candidate, route) {
     return false;
 }
 
+function placeMazeV2KeySwitchMechanics(candidate, route) {
+    const moveCount = route.length - 1;
+    const mechanicIndexes = [];
+    const gateIndexes = [];
+
+    for (
+        let index = Math.max(1, Math.floor(moveCount * 0.2));
+        index <= Math.min(route.length - 3, Math.floor(moveCount * 0.48));
+        index++
+    ) {
+        mechanicIndexes.push(index);
+    }
+
+    for (
+        let index = Math.max(3, Math.floor(moveCount * 0.6));
+        index <= Math.min(route.length - 1, Math.floor(moveCount * 0.88));
+        index++
+    ) {
+        gateIndexes.push(index);
+    }
+
+    if (mechanicIndexes.length < 2 || gateIndexes.length < 2) {
+        return false;
+    }
+
+    const shuffle = values => {
+        const shuffled = [...values];
+
+        for (let index = shuffled.length - 1; index > 0; index--) {
+            const swapIndex = Math.floor(Math.random() * (index + 1));
+            [shuffled[index], shuffled[swapIndex]] =
+                [shuffled[swapIndex], shuffled[index]];
+        }
+
+        return shuffled;
+    };
+    const maxProposals = 12;
+
+    for (let proposal = 0; proposal < maxProposals; proposal++) {
+        const positions = shuffle(mechanicIndexes).slice(0, 2);
+        const gates = shuffle(gateIndexes).slice(0, 2);
+        const reverseMechanics = Math.random() < 0.5;
+        const reverseGates = Math.random() < 0.5;
+        const keyIndex = positions[reverseMechanics ? 1 : 0];
+        const switchIndex = positions[reverseMechanics ? 0 : 1];
+        const keyGateIndex = gates[reverseGates ? 1 : 0];
+        const switchGateIndex = gates[reverseGates ? 0 : 1];
+
+        candidate.key = {
+            id: "A",
+            position: [route[keyIndex].row, route[keyIndex].col]
+        };
+        candidate.gate = {
+            keyId: "A",
+            between: [
+                [route[keyGateIndex - 1].row,
+                    route[keyGateIndex - 1].col],
+                [route[keyGateIndex].row, route[keyGateIndex].col]
+            ]
+        };
+        candidate.switch = {
+            id: "S1",
+            position: [
+                route[switchIndex].row,
+                route[switchIndex].col
+            ]
+        };
+        candidate.switchGate = {
+            switchId: "S1",
+            between: [
+                [route[switchGateIndex - 1].row,
+                    route[switchGateIndex - 1].col],
+                [route[switchGateIndex].row,
+                    route[switchGateIndex].col]
+            ]
+        };
+        const validation = validateMazeV2KeySwitch(candidate);
+
+        if (validation.valid) {
+            candidate.solution = validation.solution;
+            candidate.solutionLength = validation.solution.length - 1;
+            candidate.keyPathIndex = keyIndex;
+            candidate.gatePathIndex = keyGateIndex;
+            candidate.switchPathIndex = switchIndex;
+            candidate.switchGatePathIndex = switchGateIndex;
+            candidate.gateRequired = validation.gateRequired;
+            candidate.switchGateRequired =
+                validation.switchGateRequired;
+            candidate.generationWork.combinedMechanicProposals =
+                proposal + 1;
+            return true;
+        }
+    }
+
+    candidate.key = null;
+    candidate.gate = null;
+    candidate.switch = null;
+    candidate.switchGate = null;
+    candidate.generationWork.combinedMechanicProposals = maxProposals;
+    return false;
+}
+
 function canMoveBetweenMazeCells(
     current,
     destination,
@@ -411,8 +522,10 @@ function solveMazeV2ShortestPath(maze, start, goal, options = {}) {
         `${state.switchActive ? 1 : 0}`;
     const startState = {
         ...start,
-        hasKey: Boolean(options.hasKey || isKeyPosition(start)),
-        switchActive: Boolean(
+        hasKey: !options.disableKey && Boolean(
+            options.hasKey || isKeyPosition(start)
+        ),
+        switchActive: !options.disableSwitch && Boolean(
             options.switchActive || isSwitchPosition(start)
         )
     };
@@ -454,10 +567,12 @@ function solveMazeV2ShortestPath(maze, start, goal, options = {}) {
                 hasKey: current.hasKey,
                 switchActive: current.switchActive
             };
-            destination.hasKey = destination.hasKey ||
-                Boolean(isKeyPosition(destination));
-            destination.switchActive = destination.switchActive ||
-                Boolean(isSwitchPosition(destination));
+            destination.hasKey = !options.disableKey &&
+                (destination.hasKey ||
+                    Boolean(isKeyPosition(destination)));
+            destination.switchActive = !options.disableSwitch &&
+                (destination.switchActive ||
+                    Boolean(isSwitchPosition(destination)));
             const destinationKey = stateKey(destination);
 
             if (
@@ -558,6 +673,98 @@ function validateMazeV2SwitchAndGate(maze) {
     };
 }
 
+function validateMazeV2KeySwitch(maze) {
+    if (!maze?.key || !maze?.gate ||
+        !maze?.switch || !maze?.switchGate) {
+        return {
+            valid: false,
+            gateRequired: false,
+            switchGateRequired: false,
+            solution: null
+        };
+    }
+
+    const solution = solveMazeV2ShortestPath(
+        maze,
+        maze.start,
+        maze.goal
+    );
+    const keyRequired = solveMazeV2ShortestPath(
+        maze,
+        maze.start,
+        maze.goal,
+        { disableKey: true }
+    ) === null;
+    const gateRequired = solveMazeV2ShortestPath(
+        maze,
+        maze.start,
+        maze.goal,
+        { forceGateClosed: true }
+    ) === null;
+    const switchRequired = solveMazeV2ShortestPath(
+        maze,
+        maze.start,
+        maze.goal,
+        { disableSwitch: true }
+    ) === null;
+    const switchGateRequired = solveMazeV2ShortestPath(
+        maze,
+        maze.start,
+        maze.goal,
+        { forceSwitchGateClosed: true }
+    ) === null;
+    const keyPosition = {
+        row: maze.key.position[0],
+        col: maze.key.position[1]
+    };
+    const switchPosition = {
+        row: maze.switch.position[0],
+        col: maze.switch.position[1]
+    };
+    const keyReachable = solveMazeV2ShortestPath(
+        maze,
+        maze.start,
+        keyPosition,
+        { forceGateClosed: true }
+    );
+    const switchReachable = solveMazeV2ShortestPath(
+        maze,
+        maze.start,
+        switchPosition,
+        { forceSwitchGateClosed: true }
+    );
+    const symbolsDistinct = !mazeV2PositionsEqual(
+        keyPosition,
+        switchPosition
+    ) && !mazeV2PositionsEqual(keyPosition, maze.start) &&
+        !mazeV2PositionsEqual(keyPosition, maze.goal) &&
+        !mazeV2PositionsEqual(switchPosition, maze.start) &&
+        !mazeV2PositionsEqual(switchPosition, maze.goal);
+    const gateEdgesDistinct = !(
+        isMazeV2GateEdge(
+            { row: maze.switchGate.between[0][0],
+                col: maze.switchGate.between[0][1] },
+            { row: maze.switchGate.between[1][0],
+                col: maze.switchGate.between[1][1] },
+            maze
+        )
+    );
+
+    return {
+        valid: Boolean(
+            solution && keyRequired && gateRequired &&
+            switchRequired && switchGateRequired &&
+            keyReachable && switchReachable && symbolsDistinct &&
+            gateEdgesDistinct
+        ),
+        keyRequired,
+        gateRequired,
+        switchRequired,
+        switchGateRequired,
+        solution
+    };
+}
+
 function findMazeV2FarthestCell(maze, origin) {
     const queue = [{ ...origin, distance: 0 }];
     const visited = new Set([`${origin.row},${origin.col}`]);
@@ -651,7 +858,9 @@ function renderMazeV2Preview(
         : null;
     const checkpointPosition = keyPosition || maze.checkpoint;
     const controlledGate = maze.gate || maze.switchGate;
-    const isSwitchMode = Boolean(maze.switchGate);
+    const primaryIsSwitchGate = Boolean(
+        maze.switchGate && !maze.gate
+    );
     const svgNamespace = "http://www.w3.org/2000/svg";
     const traceSvg = document.createElementNS(svgNamespace, "svg");
     const tracePolyline = document.createElementNS(
@@ -693,7 +902,7 @@ function renderMazeV2Preview(
         row: (gateFirst.row + gateSecond.row) / 2 + 0.5,
         col: (gateFirst.col + gateSecond.col) / 2 + 0.5
     };
-    const gateHalfLength = isSwitchMode ? 0.43 : 0.36;
+    const gateHalfLength = primaryIsSwitchGate ? 0.43 : 0.36;
     let gateHinge = null;
 
     if (gateFirst.row === gateSecond.row) {
@@ -718,14 +927,14 @@ function renderMazeV2Preview(
 
     gateLine.setAttribute(
         "stroke",
-        isSwitchMode
+        primaryIsSwitchGate
             ? "var(--maze-v2-switch-gate-body-color)"
             : "var(--maze-v2-gate-color)"
     );
     gateLine.setAttribute("stroke-width", "0.16");
     gateLine.setAttribute("stroke-linecap", "round");
 
-    if (isSwitchMode) {
+    if (primaryIsSwitchGate) {
         const accentHalfLength = 0.13;
 
         if (gateFirst.row === gateSecond.row) {
@@ -779,6 +988,82 @@ function renderMazeV2Preview(
         );
     } else {
         traceSvg.append(tracePolyline, traceDot, gateLine);
+    }
+    let combinedSwitchGateGroup = null;
+
+    if (maze.gate && maze.switchGate) {
+        combinedSwitchGateGroup = document.createElementNS(
+            svgNamespace,
+            "g"
+        );
+        const body = document.createElementNS(svgNamespace, "line");
+        const accent = document.createElementNS(svgNamespace, "line");
+        const hinge = document.createElementNS(svgNamespace, "circle");
+        const [first, second] = maze.switchGate.between.map(
+            ([row, col]) => ({ row, col })
+        );
+        const midpoint = {
+            row: (first.row + second.row) / 2 + 0.5,
+            col: (first.col + second.col) / 2 + 0.5
+        };
+        const halfLength = 0.43;
+        const accentHalfLength = 0.13;
+        let hingePosition = null;
+
+        if (first.row === second.row) {
+            body.setAttribute("x1", midpoint.col);
+            body.setAttribute("x2", midpoint.col);
+            body.setAttribute("y1", midpoint.row - halfLength);
+            body.setAttribute("y2", midpoint.row + halfLength);
+            accent.setAttribute("x1", midpoint.col);
+            accent.setAttribute("x2", midpoint.col);
+            accent.setAttribute("y1", midpoint.row - accentHalfLength);
+            accent.setAttribute("y2", midpoint.row + accentHalfLength);
+            hingePosition = {
+                x: midpoint.col,
+                y: midpoint.row - halfLength
+            };
+        } else {
+            body.setAttribute("x1", midpoint.col - halfLength);
+            body.setAttribute("x2", midpoint.col + halfLength);
+            body.setAttribute("y1", midpoint.row);
+            body.setAttribute("y2", midpoint.row);
+            accent.setAttribute("x1", midpoint.col - accentHalfLength);
+            accent.setAttribute("x2", midpoint.col + accentHalfLength);
+            accent.setAttribute("y1", midpoint.row);
+            accent.setAttribute("y2", midpoint.row);
+            hingePosition = {
+                x: midpoint.col - halfLength,
+                y: midpoint.row
+            };
+        }
+
+        body.setAttribute(
+            "stroke",
+            "var(--maze-v2-switch-gate-body-color)"
+        );
+        body.setAttribute("stroke-width", "0.16");
+        body.setAttribute("stroke-linecap", "round");
+        accent.setAttribute(
+            "stroke",
+            "var(--maze-v2-switch-gate-accent-color)"
+        );
+        accent.setAttribute("stroke-width", "0.045");
+        accent.setAttribute("stroke-linecap", "round");
+        hinge.setAttribute("cx", hingePosition.x);
+        hinge.setAttribute("cy", hingePosition.y);
+        hinge.setAttribute("r", "0.13");
+        hinge.setAttribute(
+            "fill",
+            "var(--maze-v2-switch-gate-hinge-color)"
+        );
+        hinge.setAttribute(
+            "stroke",
+            "var(--maze-v2-switch-gate-accent-color)"
+        );
+        hinge.setAttribute("stroke-width", "0.05");
+        combinedSwitchGateGroup.append(body, accent);
+        traceSvg.append(combinedSwitchGateGroup, hinge);
     }
     boardElement.appendChild(traceSvg);
 
@@ -885,9 +1170,11 @@ function renderMazeV2Preview(
             traceDot.style.display = "none";
         }
 
-        const gateOpen = isSwitchMode ? switchActive : keyCollected;
+        const gateOpen = primaryIsSwitchGate
+            ? switchActive
+            : keyCollected;
 
-        if (isSwitchMode) {
+        if (primaryIsSwitchGate) {
             switchGateGroup.style.display = switchActive
                 ? "none"
                 : "inline";
@@ -899,6 +1186,12 @@ function renderMazeV2Preview(
                     ? "var(--maze-v2-gate-open-color)"
                     : "var(--maze-v2-gate-color)"
             );
+        }
+
+        if (combinedSwitchGateGroup) {
+            combinedSwitchGateGroup.style.display = switchActive
+                ? "none"
+                : "inline";
         }
 
         if (keyMarker) {
