@@ -32,6 +32,7 @@ const MAZE_V2_DIFFICULTY_RECIPES = {
 };
 let mazeV2DifficultySamples = [];
 let mazeV2DifficultyProfileSamples = [];
+let mazeV2GeneratedDifficultySamples = [];
 
 function chooseMazeV2MechanicModeForDifficulty(
     difficulty,
@@ -1603,6 +1604,128 @@ function scoreMazeV2Topology(candidate) {
     return { score, tier, components };
 }
 
+function validateMazeV2CandidateForMode(candidate, mechanicMode) {
+    if (mechanicMode === "none") {
+        return validateMazeV2Plain(candidate);
+    }
+
+    if (mechanicMode === "key") {
+        return validateMazeV2KeyAndGate(candidate);
+    }
+
+    if (mechanicMode === "switch") {
+        return validateMazeV2SwitchAndGate(candidate);
+    }
+
+    if (mechanicMode === "key-switch") {
+        return validateMazeV2KeySwitch(candidate);
+    }
+
+    return { valid: false, solution: null };
+}
+
+function applyMazeV2MechanicMode(candidate, mechanicMode) {
+    if (!candidate || !Array.isArray(candidate.solution)) {
+        return false;
+    }
+
+    const referenceRoute = candidate.solution.map(position => ({
+        ...position
+    }));
+    candidate.mechanicMode = mechanicMode;
+    candidate.key = null;
+    candidate.gate = null;
+    candidate.switch = null;
+    candidate.switchGate = null;
+
+    if (mechanicMode === "none") {
+        return true;
+    }
+
+    if (mechanicMode === "key") {
+        candidate.checkpoint = null;
+        candidate.checkpointPathIndex = null;
+        return placeMazeV2KeyAndGate(candidate, referenceRoute);
+    }
+
+    if (mechanicMode === "switch") {
+        return placeMazeV2SwitchAndGate(candidate, referenceRoute);
+    }
+
+    if (mechanicMode === "key-switch") {
+        candidate.checkpoint = null;
+        candidate.checkpointPathIndex = null;
+        return placeMazeV2KeySwitchMechanics(candidate, referenceRoute);
+    }
+
+    return false;
+}
+
+function generateMazeV2ForDifficulty(difficulty) {
+    const supportedDifficulties = new Set([
+        "easy",
+        "medium",
+        "hard",
+        "extreme"
+    ]);
+
+    if (!supportedDifficulties.has(difficulty)) {
+        console.warn(`Unsupported Maze V2 difficulty: ${difficulty}`);
+        return null;
+    }
+
+    const mechanicMode =
+        chooseMazeV2MechanicModeForDifficulty(difficulty);
+    const maxAttempts = 3;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        const candidate = createMazeV2Candidate(
+            10,
+            10,
+            "none",
+            difficulty
+        );
+
+        if (!candidate ||
+            !applyMazeV2MechanicMode(candidate, mechanicMode)) {
+            continue;
+        }
+
+        const validation = validateMazeV2CandidateForMode(
+            candidate,
+            mechanicMode
+        );
+
+        if (!validation.valid) {
+            continue;
+        }
+
+        const analysis = analyzeMazeV2Candidate(candidate);
+        const topologyScore = scoreMazeV2Topology(candidate);
+        const finalScore = scoreMazeV2Difficulty(candidate);
+
+        if (!analysis || !topologyScore || !finalScore) {
+            continue;
+        }
+
+        return {
+            difficulty,
+            mechanicMode,
+            candidate,
+            analysis,
+            topologyScore,
+            finalScore,
+            generationAttempts: attempt
+        };
+    }
+
+    console.warn(
+        `Maze V2 ${difficulty}/${mechanicMode} generation failed ` +
+        `after ${maxAttempts} attempts.`
+    );
+    return null;
+}
+
 function testMazeV2Analysis(mode = "switch", count = 5) {
     const supportedModes = new Set([
         "none",
@@ -1848,6 +1971,88 @@ function loadMazeV2DifficultySample(index) {
     return loadMazeV2CandidatePreview(
         storedSample.candidate,
         storedSample.candidate.mechanicMode
+    );
+}
+
+function testMazeV2GeneratedDifficulty(difficulty = "medium", count = 5) {
+    mazeV2GeneratedDifficultySamples = [];
+    const requestedCount = Number.isFinite(Number(count))
+        ? Math.floor(Number(count))
+        : 5;
+    const safeCount = Math.max(1, Math.min(30, requestedCount));
+    const rows = [];
+    let failures = 0;
+
+    for (let sample = 0; sample < safeCount; sample++) {
+        const generated = generateMazeV2ForDifficulty(difficulty);
+
+        if (!generated) {
+            failures++;
+            continue;
+        }
+
+        mazeV2GeneratedDifficultySamples.push(generated);
+        rows.push({
+            Sample: mazeV2GeneratedDifficultySamples.length,
+            "Requested Difficulty": generated.difficulty,
+            "Mechanic Mode": generated.mechanicMode,
+            "Topology Score": generated.topologyScore.score,
+            "Topology Tier": generated.topologyScore.tier,
+            "Final Score": generated.finalScore.score,
+            "Final Tier": generated.finalScore.tier,
+            Optimal: generated.analysis.optimal,
+            "Solution Usage": Number(
+                generated.analysis.solutionUsageRatio.toFixed(3)
+            ),
+            "Detour Ratio": generated.analysis.detourRatio,
+            "Longest Wrong Ratio":
+                generated.analysis.longestWrongBranchRatio
+        });
+    }
+
+    console.table(rows);
+    console.log("Maze V2 generated difficulty batch", {
+        requested: safeCount,
+        succeeded: rows.length,
+        failures
+    });
+    return rows;
+}
+
+// Generated difficulty sample numbers are 1-based to match the table.
+function loadMazeV2GeneratedDifficultySample(index) {
+    const sampleNumber = Number(index);
+
+    if (mazeV2GeneratedDifficultySamples.length === 0) {
+        console.warn(
+            "No generated Maze V2 difficulty samples are available. " +
+            "Run testMazeV2GeneratedDifficulty() first."
+        );
+        return null;
+    }
+
+    if (
+        !Number.isInteger(sampleNumber) ||
+        sampleNumber < 1 ||
+        sampleNumber > mazeV2GeneratedDifficultySamples.length
+    ) {
+        console.warn(
+            `Invalid generated Maze V2 sample index: ${index}. ` +
+            `Choose 1-${mazeV2GeneratedDifficultySamples.length}.`
+        );
+        return null;
+    }
+
+    if (typeof loadMazeV2CandidatePreview !== "function") {
+        console.warn("Maze V2 preview loader is unavailable.");
+        return null;
+    }
+
+    const storedSample =
+        mazeV2GeneratedDifficultySamples[sampleNumber - 1];
+    return loadMazeV2CandidatePreview(
+        storedSample.candidate,
+        storedSample.mechanicMode
     );
 }
 
