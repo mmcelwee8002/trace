@@ -35,11 +35,24 @@
       </details>
 
       <h1 class="logo">Trace</h1>
-      <p class="level-number">Level 1</p>
-      <p class="level-title"></p>
     </header>
 
+    <section id="landing-view" aria-labelledby="difficulty-heading">
+      <h2 id="difficulty-heading">Choose a difficulty</h2>
+      <div class="difficulty-choices">
+        <button type="button" data-difficulty="easy"><span>Easy</span><span class="prototype-progress">0 / 10</span></button>
+        <button type="button" data-difficulty="medium"><span>Medium</span><span class="prototype-progress">0 / 10</span></button>
+        <button type="button" data-difficulty="hard"><span>Hard</span><span class="prototype-progress">0 / 10</span></button>
+        <button type="button" data-difficulty="extreme"><span>Extreme</span><span class="prototype-progress">0 / 10</span></button>
+      </div>
+      <p id="landing-message" role="status"></p>
+    </section>
 
+    <section id="puzzle-view" aria-labelledby="puzzle-heading" hidden>
+      <h2 id="puzzle-heading" tabindex="-1"></h2>
+      <!-- Retained for legacy campaign and development helpers. -->
+      <p class="level-number" hidden></p>
+      <p class="level-title" hidden></p>
 
     <section class="game-board" aria-label="Trace puzzle board">
       <!-- The puzzle grid will be generated here with JavaScript. -->
@@ -52,15 +65,19 @@
     <p class="level-message" aria-live="polite"></p>
 
     <div class="game-controls">
-      <button class="previous-button">Previous Level</button>
-      <button id="undo-button" type="button">Undo</button>
+      <button id="home-button" type="button">Home</button>
+      <button id="catalog-previous-button" type="button" disabled>Previous</button>
+      <button class="previous-button" hidden>Previous Level</button>
+      <button id="undo-button" type="button" hidden>Undo</button>
       <button class="restart-button">Restart</button>
-      <button class="next-button">Next Level</button>
+      <button id="catalog-next-button" type="button" disabled>Next</button>
+      <button class="next-button" hidden>Next Level</button>
 
     </div>
+    </section>
 
     <!-- Temporary development-only Maze V2 launcher. -->
-    <div class="game-controls maze-v2-development-controls">
+    <div class="game-controls maze-v2-development-controls" hidden>
       <button id="maze-v2-preview-button" type="button">
         Maze V2 Preview
       </button>
@@ -87,6 +104,7 @@
   <script src="generated-board.js"></script>
   <script src="maze-v2.js"></script>
   <script src="maze-v2-catalog.js"></script>
+  <script src="navigation.js"></script>
   <script src="testing.js"></script>
 
 </body>

@@ -1,5 +1,55 @@
 /* ---------- General ---------- */
 
+[hidden] {
+  display: none !important;
+}
+
+#difficulty-heading,
+#puzzle-heading {
+  margin-bottom: 20px;
+  text-align: center;
+  font-size: 1.2rem;
+  font-weight: 400;
+}
+
+.difficulty-choices {
+  display: grid;
+  gap: 12px;
+}
+
+.difficulty-choices button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 68px;
+  padding: 18px 20px;
+  border: 1px solid var(--tile-background);
+  border-radius: 12px;
+  background: var(--control-background);
+  color: var(--page-text);
+  font: inherit;
+  font-size: 1.1rem;
+  cursor: pointer;
+}
+
+.difficulty-choices button:hover {
+  background: var(--control-hover);
+}
+
+.difficulty-choices button:focus-visible {
+  outline: 3px solid var(--path-color);
+  outline-offset: 3px;
+}
+
+.prototype-progress {
+  color: var(--muted-text);
+  font-size: 0.95rem;
+}
+
+#landing-message:not(:empty) {
+  margin-top: 16px;
+}
+
 :root {
   --page-background: #111827;
   --page-text: #f8fafc;
@@ -213,7 +263,8 @@ body {
 
 .settings summary {
   width: max-content;
-  min-height: 36px;
+  min-height: 44px;
+  min-width: 44px;
   margin-left: 0;
   padding: 6px 8px;
   border-radius: 10px;
@@ -231,8 +282,8 @@ body {
 .settings-panel {
 
   position: absolute;
-  width: 320px;
-  top: 42px;
+  width: min(320px, calc(100vw - 48px));
+  top: 50px;
   left: 0;
   z-index: 20;
 
@@ -411,6 +462,11 @@ body {
 .game-controls {
   display: flex;
   gap: 12px;
+}
+
+#puzzle-view .game-controls {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .game-controls button {

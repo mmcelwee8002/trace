@@ -2635,6 +2635,9 @@ function renderMazeV2Preview(
         ) {
             completed = true;
             isTracing = false;
+            boardElement.dispatchEvent(new CustomEvent("maze-v2-complete", {
+                detail: { maze }
+            }));
         }
     }
 
