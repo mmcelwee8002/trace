@@ -1,4 +1,4 @@
-﻿// Catalog progression lasts only for this page session.
+// Catalog progression stays usable in memory when storage is unavailable.
 (() => {
     const landing = document.querySelector("#landing-view");
     const puzzle = document.querySelector("#puzzle-view");
@@ -14,6 +14,66 @@
     ]));
     let selectedButton = null;
     let activePuzzle = null;
+    const storageKey = "traceMazeProgressV1";
+    let warnedAboutStorage = false;
+
+    function warnAboutStorage() {
+        if (warnedAboutStorage) return;
+        warnedAboutStorage = true;
+        console.warn("Trace Maze progress storage is unavailable; continuing in memory.");
+    }
+
+    function serializeProgress() {
+        return JSON.stringify({ version: 1, difficulties: progress });
+    }
+
+    function restoreProgress() {
+        let raw;
+        try {
+            raw = window.localStorage.getItem(storageKey);
+        } catch {
+            warnAboutStorage();
+            return;
+        }
+        if (!raw) return;
+        let saved;
+        try {
+            saved = JSON.parse(raw);
+        } catch {
+            return;
+        }
+        const isRecord = value => value !== null &&
+            typeof value === "object" && !Array.isArray(value);
+        if (!isRecord(saved) || saved.version !== 1 ||
+            !isRecord(saved.difficulties)) return;
+
+        for (const difficulty of Object.keys(progress)) {
+            const entry = saved.difficulties[difficulty];
+            if (!isRecord(entry)) continue;
+            const count = getMazeV2CatalogCount(difficulty);
+            const highestCompleted = Number.isSafeInteger(entry.highestCompleted)
+                ? Math.max(0, Math.min(count, entry.highestCompleted)) : 0;
+            const currentPuzzle = Number.isSafeInteger(entry.currentPuzzle)
+                ? Math.max(1, Math.min(count, highestCompleted + 1, entry.currentPuzzle)) : 1;
+            progress[difficulty] = { currentPuzzle, highestCompleted };
+        }
+    }
+
+    restoreProgress();
+    // Opening a restored puzzle or returning Home without changes needs no write.
+    let lastSavedProgress = serializeProgress();
+
+    function saveProgress() {
+        const serialized = serializeProgress();
+        if (serialized === lastSavedProgress) return;
+        try {
+            window.localStorage.setItem(storageKey, serialized);
+            lastSavedProgress = serialized;
+        } catch {
+            // Leave it dirty so a later navigation (including Home) can retry.
+            warnAboutStorage();
+        }
+    }
 
     function updateProgress() {
         buttons.forEach(button => {
@@ -62,6 +122,7 @@
                 controller: window.mazeV2PreviewController
             };
             updateProgress();
+            saveProgress();
             heading.focus();
         } catch (error) {
             releasePuzzle();
@@ -89,6 +150,7 @@
             state.highestCompleted = state.currentPuzzle;
         }
         updateProgress();
+        saveProgress();
     });
 
     previous.addEventListener("click", () => {
@@ -101,12 +163,35 @@
     });
 
     document.querySelector("#home-button").addEventListener("click", () => {
+        saveProgress();
         releasePuzzle();
         settings.open = false;
         puzzle.hidden = true;
         landing.hidden = false;
         selectedButton?.focus();
     });
+
+    // Development console helper; deliberately has no player-facing control.
+    window.resetTraceMazeProgress = () => {
+        releasePuzzle();
+        for (const difficulty of Object.keys(progress)) {
+            progress[difficulty] = { currentPuzzle: 1, highestCompleted: 0 };
+        }
+        try {
+            window.localStorage.removeItem(storageKey);
+        } catch {
+            warnAboutStorage();
+        }
+        lastSavedProgress = serializeProgress();
+        settings.open = false;
+        puzzle.hidden = true;
+        landing.hidden = false;
+        message.textContent = "";
+        previous.disabled = true;
+        next.disabled = true;
+        updateProgress();
+        selectedButton?.focus();
+    };
 
     updateProgress();
 })();
