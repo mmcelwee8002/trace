@@ -322,6 +322,15 @@ body {
 
 /* ---------- Game Board ---------- */
 
+/* Reflect walls, gates and trace together; keep mechanic labels readable. */
+.game-board[data-maze-v2="true"][data-handedness="left"] {
+  transform: scaleX(-1);
+}
+
+.game-board[data-maze-v2="true"][data-handedness="left"] .maze-v2-cell > span {
+  transform: scaleX(-1);
+}
+
 .game-board {
     touch-action: none;
     user-select: none;
@@ -591,5 +600,152 @@ footer {
   body {
     justify-content: flex-start;
     align-items: center;
+  }
+}
+
+/* Active puzzle only; retain the existing board width and landing layout. */
+body:has(#puzzle-view:not([hidden])) {
+  min-height: 100svh;
+}
+
+.game-shell:has(#puzzle-view:not([hidden])) {
+  padding-top: 16px;
+  padding-bottom: 12px;
+}
+
+.game-shell:has(#puzzle-view:not([hidden])) .game-header {
+  margin-bottom: 4px;
+}
+
+.game-shell:has(#puzzle-view:not([hidden])) .logo {
+  font-size: 1.75rem;
+  line-height: 1.2;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.game-shell:has(#puzzle-view:not([hidden])) .settings {
+  top: 0;
+}
+
+.game-shell:has(#puzzle-view:not([hidden])) .settings summary {
+  display: grid;
+  place-items: center;
+  background: transparent;
+  color: var(--muted-text);
+  font-size: 1.25rem;
+}
+
+.game-shell:has(#puzzle-view:not([hidden])) .settings summary:hover,
+.game-shell:has(#puzzle-view:not([hidden])) .settings[open] summary {
+  background: var(--control-background);
+}
+
+#puzzle-view #puzzle-heading {
+  margin: 0 44px 16px;
+  color: var(--muted-text);
+  font-size: 0.9rem;
+  line-height: 1.4;
+  font-weight: 400;
+}
+
+#puzzle-view .game-board {
+  margin-bottom: 12px;
+}
+
+#puzzle-view .game-message {
+  margin-bottom: 12px;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  text-wrap: pretty;
+}
+
+#puzzle-view .level-message:empty {
+  display: none;
+}
+
+#puzzle-view .level-message:not(:empty) {
+  min-height: 0;
+  margin-bottom: 12px;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+#puzzle-view .game-controls {
+  grid-template-columns: 0.8fr 1.15fr 1fr 0.9fr;
+  gap: 6px;
+}
+
+#puzzle-view .game-controls button {
+  min-width: 0;
+  min-height: 44px;
+  padding: 10px 6px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  font: inherit;
+  font-size: 0.85rem;
+}
+
+#puzzle-view #home-button {
+  background: transparent;
+  color: var(--muted-text);
+}
+
+#puzzle-view .restart-button {
+  background: transparent;
+  border-color: var(--tile-background);
+}
+
+#puzzle-view #home-button:hover,
+#puzzle-view .restart-button:hover {
+  background: var(--control-hover);
+}
+
+#puzzle-view .game-controls button:disabled {
+  opacity: 1;
+  border-color: var(--control-disabled);
+}
+
+#puzzle-view #catalog-next-button:enabled {
+  background: var(--path-color);
+  color: var(--page-background);
+  font-weight: 700;
+}
+
+#puzzle-view #catalog-next-button:enabled:hover {
+  box-shadow: inset 0 0 0 2px var(--page-background);
+}
+
+body:has(#puzzle-view:not([hidden])) footer {
+  max-width: min(430px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 8px 0 max(12px, env(safe-area-inset-bottom));
+  border: 0;
+  background: transparent;
+  color: var(--muted-text);
+  font-size: 0.65rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+body:has(#puzzle-view:not([hidden])) footer a {
+  color: inherit;
+  text-underline-offset: 2px;
+}
+
+@media (max-width: 319px) {
+  #puzzle-view .game-controls {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-height: 650px) {
+  .game-shell:has(#puzzle-view:not([hidden])) {
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
+
+  #puzzle-view #puzzle-heading {
+    margin-bottom: 10px;
   }
 }

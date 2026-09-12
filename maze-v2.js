@@ -2559,7 +2559,12 @@ function renderMazeV2Preview(
             Math.abs(localY - centerY) <=
                 cellHeight * 0.5 * effectiveTouchTolerance;
 
-        return withinTolerance ? { row, col } : null;
+        return withinTolerance ? {
+            row,
+            col: boardElement.dataset.handedness === "left"
+                ? maze.cols - 1 - col
+                : col
+        } : null;
     }
 
     function tryPosition(position) {
@@ -2705,6 +2710,10 @@ function renderMazeV2Preview(
 
     const controller = {
         reset: resetToStart,
+        // Mirror the view without rebuilding the canonical puzzle or attempt.
+        setHandedness(value) {
+            boardElement.dataset.handedness = value === "left" ? "left" : "right";
+        },
         isKeyCheckpointActive: () => keyCollected,
         isSwitchActive: () => switchActive,
         destroy() {
@@ -2734,5 +2743,6 @@ function renderMazeV2Preview(
     };
 
     window.mazeV2PreviewController = controller;
+    controller.setHandedness(typeof handedness === "string" ? handedness : "right");
     return controller;
 }

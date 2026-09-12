@@ -740,6 +740,11 @@ function handleHandednessChange(event) {
     handedness = event.target.value;
     localStorage.setItem(HANDEDNESS_STORAGE_KEY, handedness);
 
+    if (board.dataset.mazeV2 === "true" && window.mazeV2PreviewController) {
+        window.mazeV2PreviewController.setHandedness(handedness);
+        return;
+    }
+
     // Rebuild only the presentation. The level model and active path retain
     // their original canonical coordinates.
     createBoard();
