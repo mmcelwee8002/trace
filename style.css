@@ -170,6 +170,17 @@ body:has(#landing-view:not([hidden])) footer a {
   border-color: var(--muted-text);
 }
 
+/* Avoid over-zooming the square maze artwork on tall, narrow phones. */
+@media (max-width: 600px) {
+  body:has(#landing-view:not([hidden]))::before {
+    background-position: center top;
+    background-size: max(620px, 165vw) auto;
+    background-repeat: repeat-y;
+    filter: grayscale(0.65) contrast(0.95);
+    opacity: 0.19;
+  }
+}
+
 @media (max-width: 380px) {
   .game-shell:has(#landing-view:not([hidden])) {
     padding: 24px 16px;
