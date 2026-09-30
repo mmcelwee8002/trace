@@ -130,6 +130,10 @@ function createMazeV2Candidate(
     const mechanicMode = typeof options === "string"
         ? options
         : options.mechanicMode || "key";
+    const intendedSingleMechanic = difficultyProfile === "extreme" &&
+        ["key", "switch"].includes(options.intendedMechanicMode)
+        ? options.intendedMechanicMode
+        : null;
 
     const supportedProfiles = new Set([
         "easy",
@@ -162,10 +166,14 @@ function createMazeV2Candidate(
         } else if (difficultyProfile === "hard") {
             candidate = createMazeV2HardTopologyCandidate(rows, cols);
         } else {
-            candidate = createMazeV2ExtremeTopologyCandidate(rows, cols);
+            candidate = createMazeV2ExtremeTopologyCandidate(
+                rows, cols, intendedSingleMechanic
+            );
         }
 
-        const difficulty = scoreMazeV2Difficulty(candidate);
+        const difficulty = scoreMazeV2ProjectedSingleMechanic(
+            candidate, intendedSingleMechanic
+        );
         const targetScore = {
             easy: 0,
             medium: 52,
@@ -372,14 +380,19 @@ function createMazeV2HardTopologyCandidate(rows = 10, cols = 10) {
     });
 }
 
-function createMazeV2ExtremeTopologyCandidate(rows = 10, cols = 10) {
+function createMazeV2ExtremeTopologyCandidate(
+    rows = 10, cols = 10, intendedSingleMechanic = null
+) {
     return createMazeV2GrowingTreeTopologyCandidate(rows, cols, {
         recentGrowthBias: 1,
-        targetUsageRatio: 0.82,
-        minimumUsageRatio: 0.72,
+        // Single mechanics add only 7.5 points. Leave roughly 30% off-route
+        // for deception, with the existing Hard profile's minimum route usage.
+        targetUsageRatio: intendedSingleMechanic ? 0.7 : 0.82,
+        minimumUsageRatio: intendedSingleMechanic ? 0.58 : 0.72,
         minimumManhattanRatio: 0.15,
         preferredDetourRatio: 8,
         targetDifficultyScore: 82,
+        intendedSingleMechanic,
         strategy: "extreme-growing-tree"
     });
 }
@@ -627,8 +640,8 @@ function chooseMazeV2ProfileEndpoints(maze, settings) {
                 key: null,
                 switch: null
             };
-            const difficulty = scoreMazeV2Difficulty(
-                diagnosticCandidate
+            const difficulty = scoreMazeV2ProjectedSingleMechanic(
+                diagnosticCandidate, settings.intendedSingleMechanic
             );
             const scoreDistance = Math.abs(
                 difficulty.score - settings.targetDifficultyScore
@@ -1519,6 +1532,15 @@ function analyzeMazeV2Candidate(candidate) {
     };
 }
 
+function scoreMazeV2ProjectedSingleMechanic(candidate, mechanicMode) {
+    // On these trees, single mechanics and their gates lie on the route.
+    // Placement preserves the route, so only the mechanic score changes.
+    return scoreMazeV2Difficulty(candidate && mechanicMode ? {
+        ...candidate,
+        [mechanicMode]: {}
+    } : candidate);
+}
+
 function scoreMazeV2Difficulty(candidate) {
     const analysis = analyzeMazeV2Candidate(candidate);
 
@@ -1685,7 +1707,7 @@ function generateMazeV2ForDifficulty(difficulty, options = {}) {
         const candidate = createMazeV2Candidate(
             10,
             10,
-            "none",
+            { mechanicMode: "none", intendedMechanicMode: mechanicMode },
             difficulty
         );
 

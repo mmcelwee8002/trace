@@ -1,0 +1,441 @@
+﻿{
+    "baselineCommit":  "7973039d7869971abd498cda5bc16618f7a5f252",
+    "generatorSha256":  "A32FF9900ECC02A2F846A7064DB414D672B733417D163D6DF44DC65462362A3D",
+    "rng":  "Mulberry32; seed = 0x54524143 + difficultyIndex * 10000 + (forced switch ? 1000 : 0) + requestIndex",
+    "commands":  [
+                     "node trial-maze-v2.js maze-v2.js 50 targeted",
+                     "node trial-maze-v2.js maze-v2.js 50 regression",
+                     "node trial-maze-v2.js maze-v2.js 10 targeted",
+                     "node trial-maze-v2.js maze-v2.js 10 unchanged"
+                 ],
+    "candidateAttemptDefinition":  "One createMazeV2Candidate call, including rejected candidates and exhausted requests",
+    "mazeSampleDefinition":  "One growing-tree topology sample: 12 per Easy/Medium candidate attempt, 20 per Hard/Extreme attempt",
+    "retriesDefinition":  "Candidate attempts beyond the first attempt of each request",
+    "duplicateDefinition":  "Identical wall topology, checked across all groups within each suite",
+    "projectedScoreAndRouteChecks":  "All 20 paired-after single-mechanic requests matched their pre-placement projected score and route",
+    "targeted":  [
+                     {
+                         "difficulty":  "extreme",
+                         "mode":  "key",
+                         "requests":  50,
+                         "successes":  50,
+                         "candidateAttempts":  244,
+                         "mazeSamples":  4880,
+                         "retries":  194,
+                         "firstAttempt":  12,
+                         "maxAttempts":  26,
+                         "valid":  50,
+                         "solvable":  50,
+                         "duplicates":  0,
+                         "modes":  {
+                                       "key":  50
+                                   },
+                         "scoreRange":  [
+                                            75,
+                                            79.4
+                                        ],
+                         "outputDigest":  "1f2c0ff9f25b3f4c1885348057fa46a42538f9c2f52255d17d559213bd38d282"
+                     },
+                     {
+                         "difficulty":  "extreme",
+                         "mode":  "switch",
+                         "requests":  50,
+                         "successes":  50,
+                         "candidateAttempts":  180,
+                         "mazeSamples":  3600,
+                         "retries":  130,
+                         "firstAttempt":  15,
+                         "maxAttempts":  12,
+                         "valid":  50,
+                         "solvable":  50,
+                         "duplicates":  0,
+                         "modes":  {
+                                       "switch":  50
+                                   },
+                         "scoreRange":  [
+                                            75,
+                                            79.6
+                                        ],
+                         "outputDigest":  "48fd7dea4bdc5be8ddd09c176e157dc44365e26c8db26935da5269158fdbcb3d"
+                     }
+                 ],
+    "regression":  [
+                       {
+                           "difficulty":  "easy",
+                           "mode":  "recipe",
+                           "requests":  50,
+                           "successes":  50,
+                           "candidateAttempts":  80,
+                           "mazeSamples":  960,
+                           "retries":  30,
+                           "firstAttempt":  46,
+                           "maxAttempts":  14,
+                           "valid":  50,
+                           "solvable":  50,
+                           "duplicates":  0,
+                           "modes":  {
+                                         "none":  45,
+                                         "key":  5
+                                     },
+                           "scoreRange":  [
+                                              31.3,
+                                              44.8
+                                          ],
+                           "outputDigest":  "77aa3c007964260a22c4e0d7f5ecd4b0122eac26edac9ac65e6981a5be3fe2dd"
+                       },
+                       {
+                           "difficulty":  "medium",
+                           "mode":  "recipe",
+                           "requests":  50,
+                           "successes":  50,
+                           "candidateAttempts":  55,
+                           "mazeSamples":  660,
+                           "retries":  5,
+                           "firstAttempt":  45,
+                           "maxAttempts":  2,
+                           "valid":  50,
+                           "solvable":  50,
+                           "duplicates":  0,
+                           "modes":  {
+                                         "switch":  20,
+                                         "key":  14,
+                                         "none":  16
+                                     },
+                           "scoreRange":  [
+                                              50.8,
+                                              59.9
+                                          ],
+                           "outputDigest":  "0d0076b179a38498475ad9ef29a92da82c8fb74a0424e03b32d34bd040fe1bc2"
+                       },
+                       {
+                           "difficulty":  "hard",
+                           "mode":  "recipe",
+                           "requests":  50,
+                           "successes":  50,
+                           "candidateAttempts":  132,
+                           "mazeSamples":  2640,
+                           "retries":  82,
+                           "firstAttempt":  36,
+                           "maxAttempts":  16,
+                           "valid":  50,
+                           "solvable":  50,
+                           "duplicates":  0,
+                           "modes":  {
+                                         "switch":  16,
+                                         "key-switch":  19,
+                                         "key":  15
+                                     },
+                           "scoreRange":  [
+                                              65.2,
+                                              74.9
+                                          ],
+                           "outputDigest":  "233663a91bb60f4e54cab2aed8d5983afff770f05975d61c0d41f292c03e1dfe"
+                       },
+                       {
+                           "difficulty":  "extreme",
+                           "mode":  "recipe",
+                           "requests":  50,
+                           "successes":  50,
+                           "candidateAttempts":  85,
+                           "mazeSamples":  1700,
+                           "retries":  35,
+                           "firstAttempt":  40,
+                           "maxAttempts":  13,
+                           "valid":  50,
+                           "solvable":  50,
+                           "duplicates":  0,
+                           "modes":  {
+                                         "key-switch":  37,
+                                         "key":  7,
+                                         "switch":  6
+                                     },
+                           "scoreRange":  [
+                                              75.1,
+                                              82.4
+                                          ],
+                           "outputDigest":  "f66796708f65a10a1981124f7a5088b5a96f67f10410368d53f30ccfd88bb9c0"
+                       }
+                   ],
+    "pairedBefore":  [
+                         {
+                             "difficulty":  "extreme",
+                             "mode":  "key",
+                             "requests":  10,
+                             "successes":  9,
+                             "candidateAttempts":  489,
+                             "mazeSamples":  9780,
+                             "retries":  479,
+                             "firstAttempt":  0,
+                             "maxAttempts":  100,
+                             "valid":  9,
+                             "solvable":  9,
+                             "duplicates":  0,
+                             "modes":  {
+                                           "key":  9
+                                       },
+                             "scoreRange":  [
+                                                75.1,
+                                                79.1
+                                            ],
+                             "outputDigest":  "0e8c05152f29f37b3b30cff038d61c611f810b177f3b692e3ea35b8e21f6259d"
+                         },
+                         {
+                             "difficulty":  "extreme",
+                             "mode":  "switch",
+                             "requests":  10,
+                             "successes":  9,
+                             "candidateAttempts":  427,
+                             "mazeSamples":  8540,
+                             "retries":  417,
+                             "firstAttempt":  0,
+                             "maxAttempts":  100,
+                             "valid":  9,
+                             "solvable":  9,
+                             "duplicates":  0,
+                             "modes":  {
+                                           "switch":  9
+                                       },
+                             "scoreRange":  [
+                                                75.2,
+                                                78.2
+                                            ],
+                             "outputDigest":  "613955f66caed69770a758464b19431794fdd5099d9ad784f690cf51e2db100e"
+                         }
+                     ],
+    "pairedAfter":  [
+                        {
+                            "difficulty":  "extreme",
+                            "mode":  "key",
+                            "requests":  10,
+                            "successes":  10,
+                            "candidateAttempts":  50,
+                            "mazeSamples":  1000,
+                            "retries":  40,
+                            "firstAttempt":  2,
+                            "maxAttempts":  13,
+                            "valid":  10,
+                            "solvable":  10,
+                            "duplicates":  0,
+                            "modes":  {
+                                          "key":  10
+                                      },
+                            "scoreRange":  [
+                                               75,
+                                               79.4
+                                           ],
+                            "outputDigest":  "16a533b081e856fe8b61fb3c17f22b680c6dd2b533b4ecce69527e6ecdfd354b"
+                        },
+                        {
+                            "difficulty":  "extreme",
+                            "mode":  "switch",
+                            "requests":  10,
+                            "successes":  10,
+                            "candidateAttempts":  20,
+                            "mazeSamples":  400,
+                            "retries":  10,
+                            "firstAttempt":  6,
+                            "maxAttempts":  5,
+                            "valid":  10,
+                            "solvable":  10,
+                            "duplicates":  0,
+                            "modes":  {
+                                          "switch":  10
+                                      },
+                            "scoreRange":  [
+                                               75.1,
+                                               79.6
+                                           ],
+                            "outputDigest":  "fc0da879ec95a3a89c12f2d6d5b114818b047f6f91e4845dbaf7d3d492e0f60f"
+                        }
+                    ],
+    "unchangedBefore":  [
+                            {
+                                "difficulty":  "easy",
+                                "mode":  "recipe",
+                                "requests":  10,
+                                "successes":  10,
+                                "candidateAttempts":  14,
+                                "mazeSamples":  168,
+                                "retries":  4,
+                                "firstAttempt":  9,
+                                "maxAttempts":  5,
+                                "valid":  10,
+                                "solvable":  10,
+                                "duplicates":  0,
+                                "modes":  {
+                                              "none":  9,
+                                              "key":  1
+                                          },
+                                "scoreRange":  [
+                                                   38.9,
+                                                   44
+                                               ],
+                                "outputDigest":  "a85d51f71516c10a6184a0146757783c6af11513e8691904255fe9eb5192a18c"
+                            },
+                            {
+                                "difficulty":  "medium",
+                                "mode":  "recipe",
+                                "requests":  10,
+                                "successes":  10,
+                                "candidateAttempts":  12,
+                                "mazeSamples":  144,
+                                "retries":  2,
+                                "firstAttempt":  8,
+                                "maxAttempts":  2,
+                                "valid":  10,
+                                "solvable":  10,
+                                "duplicates":  0,
+                                "modes":  {
+                                              "switch":  5,
+                                              "key":  2,
+                                              "none":  3
+                                          },
+                                "scoreRange":  [
+                                                   51,
+                                                   59.9
+                                               ],
+                                "outputDigest":  "cfb82cca58483eab62ad5db7d32e457cdc0b672ff1d10fd05e826bab9d81bb92"
+                            },
+                            {
+                                "difficulty":  "hard",
+                                "mode":  "recipe",
+                                "requests":  10,
+                                "successes":  10,
+                                "candidateAttempts":  41,
+                                "mazeSamples":  820,
+                                "retries":  31,
+                                "firstAttempt":  6,
+                                "maxAttempts":  16,
+                                "valid":  10,
+                                "solvable":  10,
+                                "duplicates":  0,
+                                "modes":  {
+                                              "switch":  4,
+                                              "key-switch":  5,
+                                              "key":  1
+                                          },
+                                "scoreRange":  [
+                                                   67.9,
+                                                   74.9
+                                               ],
+                                "outputDigest":  "62977103fd72b0d23f4ed24f4415034d652ff3d021eeb6bcff3cab60e8972618"
+                            },
+                            {
+                                "difficulty":  "extreme",
+                                "mode":  "key-switch",
+                                "requests":  10,
+                                "successes":  10,
+                                "candidateAttempts":  10,
+                                "mazeSamples":  200,
+                                "retries":  0,
+                                "firstAttempt":  10,
+                                "maxAttempts":  1,
+                                "valid":  10,
+                                "solvable":  10,
+                                "duplicates":  0,
+                                "modes":  {
+                                              "key-switch":  10
+                                          },
+                                "scoreRange":  [
+                                                   77.6,
+                                                   80.6
+                                               ],
+                                "outputDigest":  "d7da9cbd8d40a568cae4b90762b320330a48c50fe27ef5effb25065565958a4f"
+                            }
+                        ],
+    "unchangedAfter":  [
+                           {
+                               "difficulty":  "easy",
+                               "mode":  "recipe",
+                               "requests":  10,
+                               "successes":  10,
+                               "candidateAttempts":  14,
+                               "mazeSamples":  168,
+                               "retries":  4,
+                               "firstAttempt":  9,
+                               "maxAttempts":  5,
+                               "valid":  10,
+                               "solvable":  10,
+                               "duplicates":  0,
+                               "modes":  {
+                                             "none":  9,
+                                             "key":  1
+                                         },
+                               "scoreRange":  [
+                                                  38.9,
+                                                  44
+                                              ],
+                               "outputDigest":  "a85d51f71516c10a6184a0146757783c6af11513e8691904255fe9eb5192a18c"
+                           },
+                           {
+                               "difficulty":  "medium",
+                               "mode":  "recipe",
+                               "requests":  10,
+                               "successes":  10,
+                               "candidateAttempts":  12,
+                               "mazeSamples":  144,
+                               "retries":  2,
+                               "firstAttempt":  8,
+                               "maxAttempts":  2,
+                               "valid":  10,
+                               "solvable":  10,
+                               "duplicates":  0,
+                               "modes":  {
+                                             "switch":  5,
+                                             "key":  2,
+                                             "none":  3
+                                         },
+                               "scoreRange":  [
+                                                  51,
+                                                  59.9
+                                              ],
+                               "outputDigest":  "cfb82cca58483eab62ad5db7d32e457cdc0b672ff1d10fd05e826bab9d81bb92"
+                           },
+                           {
+                               "difficulty":  "hard",
+                               "mode":  "recipe",
+                               "requests":  10,
+                               "successes":  10,
+                               "candidateAttempts":  41,
+                               "mazeSamples":  820,
+                               "retries":  31,
+                               "firstAttempt":  6,
+                               "maxAttempts":  16,
+                               "valid":  10,
+                               "solvable":  10,
+                               "duplicates":  0,
+                               "modes":  {
+                                             "switch":  4,
+                                             "key-switch":  5,
+                                             "key":  1
+                                         },
+                               "scoreRange":  [
+                                                  67.9,
+                                                  74.9
+                                              ],
+                               "outputDigest":  "62977103fd72b0d23f4ed24f4415034d652ff3d021eeb6bcff3cab60e8972618"
+                           },
+                           {
+                               "difficulty":  "extreme",
+                               "mode":  "key-switch",
+                               "requests":  10,
+                               "successes":  10,
+                               "candidateAttempts":  10,
+                               "mazeSamples":  200,
+                               "retries":  0,
+                               "firstAttempt":  10,
+                               "maxAttempts":  1,
+                               "valid":  10,
+                               "solvable":  10,
+                               "duplicates":  0,
+                               "modes":  {
+                                             "key-switch":  10
+                                         },
+                               "scoreRange":  [
+                                                  77.6,
+                                                  80.6
+                                              ],
+                               "outputDigest":  "d7da9cbd8d40a568cae4b90762b320330a48c50fe27ef5effb25065565958a4f"
+                           }
+                       ]
+}
