@@ -13,6 +13,8 @@ vm.runInThisContext(fs.readFileSync(generatorPath, "utf8"), {
 const difficulties = ["easy", "medium", "hard", "extreme"];
 const puzzlesPerDifficulty = 10;
 const maximumAttemptsPerDifficulty = 100;
+const dryRun = process.argv.includes("--dry-run");
+const generationStats = {};
 const fingerprints = new Set();
 const catalog = Object.fromEntries(
     difficulties.map(difficulty => [difficulty, []])
@@ -27,7 +29,7 @@ function wallMask(cell) {
 
 function topologyFingerprint(candidate) {
     return `${candidate.rows}x${candidate.cols}:` +
-        candidate.cells.flat().map(wallMask).join("");
+        candidate.cells.flat().map(wallMask).join(",");
 }
 
 function validateFrozenSourceCandidate(generated) {
@@ -77,13 +79,23 @@ function freezeCandidate(generated, difficulty, puzzleNumber) {
 
 for (const difficulty of difficulties) {
     let attempts = 0;
+    generationStats[difficulty] = { candidateAttempts: 0, duplicates: 0 };
 
     while (
         catalog[difficulty].length < puzzlesPerDifficulty &&
         attempts < maximumAttemptsPerDifficulty
     ) {
         attempts++;
-        const generated = generateMazeV2ForDifficulty(difficulty);
+        const generated = generateMazeV2ForDifficulty(difficulty, {
+            requireScoreBand: true
+        });
+
+        // Fail explicitly instead of redrawing the mechanic and biasing its mix.
+        if (!generated) {
+            throw new Error(`Strict generation exhausted for ${difficulty}. ` +
+                "Catalog unchanged; investigate this mechanic/profile pairing.");
+        }
+        generationStats[difficulty].candidateAttempts += generated.generationAttempts;
 
         if (!validateFrozenSourceCandidate(generated)) {
             continue;
@@ -92,6 +104,7 @@ for (const difficulty of difficulties) {
         const fingerprint = topologyFingerprint(generated.candidate);
 
         if (fingerprints.has(fingerprint)) {
+            generationStats[difficulty].duplicates++;
             continue;
         }
 
@@ -109,6 +122,7 @@ for (const difficulty of difficulties) {
             `after ${attempts} attempts.`
         );
     }
+    console.log(difficulty, generationStats[difficulty]);
 }
 
 const currentSource = fs.readFileSync(catalogPath, "utf8");
@@ -123,7 +137,9 @@ if (nextSource === currentSource) {
     throw new Error("Catalog data markers were not found.");
 }
 
-fs.writeFileSync(catalogPath, nextSource, "utf8");
+if (!dryRun) {
+    fs.writeFileSync(catalogPath, nextSource, "utf8");
+}
 
 const mechanicDistribution = {};
 const tierDistribution = {};
@@ -137,7 +153,8 @@ for (const entries of Object.values(catalog)) {
     }
 }
 
-console.log("Maze V2 catalog generated", {
+console.log(dryRun ? "Maze V2 catalog dry run (no files changed)" : "Maze V2 catalog generated", {
+    generationStats,
     counts: Object.fromEntries(
         difficulties.map(difficulty => [
             difficulty,

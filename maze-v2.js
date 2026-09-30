@@ -1661,7 +1661,7 @@ function applyMazeV2MechanicMode(candidate, mechanicMode) {
     return false;
 }
 
-function generateMazeV2ForDifficulty(difficulty) {
+function generateMazeV2ForDifficulty(difficulty, options = {}) {
     const supportedDifficulties = new Set([
         "easy",
         "medium",
@@ -1676,7 +1676,10 @@ function generateMazeV2ForDifficulty(difficulty) {
 
     const mechanicMode =
         chooseMazeV2MechanicModeForDifficulty(difficulty);
-    const maxAttempts = 3;
+    // Keep the chosen mechanic across retries so score filtering does not
+    // silently favor easier-to-generate mechanic modes in the catalog.
+    const requireScoreBand = options.requireScoreBand === true;
+    const maxAttempts = requireScoreBand ? 100 : 3;
 
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         const candidate = createMazeV2Candidate(
@@ -1705,6 +1708,10 @@ function generateMazeV2ForDifficulty(difficulty) {
         const finalScore = scoreMazeV2Difficulty(candidate);
 
         if (!analysis || !topologyScore || !finalScore) {
+            continue;
+        }
+
+        if (requireScoreBand && finalScore.tier.toLowerCase() !== difficulty) {
             continue;
         }
 
